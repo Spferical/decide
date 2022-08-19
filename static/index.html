@@ -1,0 +1,21 @@
+<html>
+  <script>
+    function init() {
+        const status = document.getElementById("status");
+        const uri = 'ws://' + location.host + '/ws';
+        const ws = new WebSocket(uri);
+        ws.onopen = function() {
+            status.innerHTML = '<p><em>Waiting for opponent...</em></p>';
+        };
+        ws.onclose = function() {
+            status.innerHTML = '<p><em>Disconnected from server! Try refreshing.</em></p>';
+        }
+    }
+  </script>
+  <body onload="init()">
+    <div id="status">Not connected.</div>
+    <button id="rock">rock</button>
+    <button id="paper">paper</button>
+    <button id="scissors">scissors</button>
+  </body>
+</html>
