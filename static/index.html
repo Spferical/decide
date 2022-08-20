@@ -1,4 +1,29 @@
 <html>
+  <head>
+    <style type="text/css">
+      body{
+        margin:40px auto;
+        max-width:650px;
+        line-height:1.6;
+        font-size:18px;
+        color:#444;
+        padding:0 10px
+      }
+      button{
+        margin:40px auto;
+        max-width:650px;
+        line-height:1.6;
+        font-size:18px;
+        color:#444;
+        padding:0 10px
+      }
+      h1,
+      h2,
+      h3{
+        line-height:1.2
+      }
+    </style>
+  </head>
   <script>
     function init() {
         const status = document.getElementById("status");
@@ -14,11 +39,17 @@
             console.log("Got ws message: " + msg.data);
             status.innerHTML = '<p>' + msg.data + '</p>'
         };
+        ["rock", "paper", "scissors"].forEach(choice => {
+            const button = document.getElementById(choice);
+            button.onclick = function() {
+                ws.send(JSON.stringify({"choice": choice}));
+            }
+        });
     }
   </script>
   <body onload="init()">
     <div id="status">Not connected.</div>
-    <button id="rock">rock</button>
+    <button type="button" id="rock">rock</button>
     <button id="paper">paper</button>
     <button id="scissors">scissors</button>
   </body>

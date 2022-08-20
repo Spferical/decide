@@ -16,20 +16,65 @@ struct PlayerId(u64);
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct RoomId(String);
 
-#[derive(Default)]
-struct Game {
-    players: Vec<PlayerId>,
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Choice {
+    Rock,
+    Paper,
+    Scissors,
 }
 
-/// Representation of game state sent to a player.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GameOutcome {
+    Win,
+    Loss,
+    Draw,
+}
+
+impl Choice {
+    fn get_outcome(self, other: Self) -> GameOutcome {
+        match (self, other) {
+            (Self::Rock, Self::Paper) => GameOutcome::Loss,
+            (Self::Paper, Self::Scissors) => GameOutcome::Loss,
+            (Self::Scissors, Self::Rock) => GameOutcome::Loss,
+            (Self::Paper, Self::Rock) => GameOutcome::Win,
+            (Self::Scissors, Self::Paper) => GameOutcome::Win,
+            (Self::Rock, Self::Scissors) => GameOutcome::Win,
+            _ => GameOutcome::Draw,
+        }
+    }
+}
+
+struct PlayerState {
+    tx: mpsc::Sender<RoomView>,
+    choice: Option<Choice>,
+}
+
+#[derive(Default)]
+struct Room {
+    players: HashMap<PlayerId, PlayerState>,
+    history: Vec<HashMap<PlayerId, Choice>>,
+}
+
+/// Representation of room state sent to a player.
 #[derive(serde::Serialize)]
-struct GameView {
+struct RoomView {
     num_players: u64,
+    choice: Option<Choice>,
+    history: Vec<(Choice, Choice)>,
+    wins: u64,
+    draws: u64,
+    losses: u64,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Command {
+    Choice(Choice),
 }
 
 struct GlobalState {
-    rooms: HashMap<RoomId, Game>,
-    player_channels: HashMap<PlayerId, mpsc::Sender<String>>,
+    rooms: HashMap<RoomId, Room>,
     next_player_id: u64,
 }
 
@@ -37,7 +82,6 @@ impl GlobalState {
     fn new() -> Self {
         Self {
             rooms: HashMap::new(),
-            player_channels: HashMap::new(),
             next_player_id: 1,
         }
     }
@@ -47,21 +91,44 @@ impl GlobalState {
         PlayerId(self.next_player_id - 1)
     }
 
-    fn get_game_view(&self, room: &RoomId, _id: PlayerId) -> GameView {
-        let game = self.rooms.get(&room).unwrap();
-        GameView {
-            num_players: game.players.len() as u64,
+    fn get_game_view(&self, room_id: &RoomId, player_id: PlayerId) -> RoomView {
+        let room = self.rooms.get(&room_id).unwrap();
+        let history = room
+            .history
+            .iter()
+            .map(|choices| {
+                let mut choices = choices.clone();
+                let player_choice = choices.remove(&player_id).unwrap();
+                // assuming only one other rps player
+                let other_choice = *choices.iter().next().unwrap().1;
+                (player_choice, other_choice)
+            })
+            .collect::<Vec<_>>();
+        let (wins, losses, draws) =
+            history
+                .iter()
+                .fold((0, 0, 0), |(w, l, d), (a, b)| match a.get_outcome(*b) {
+                    GameOutcome::Win => (w + 1, l, d),
+                    GameOutcome::Loss => (w, l + 1, d),
+                    GameOutcome::Draw => (w, l, d + 1),
+                });
+        RoomView {
+            num_players: room.players.len() as u64,
+            choice: room.players.get(&player_id).unwrap().choice,
+            history,
+            wins,
+            losses,
+            draws,
         }
     }
 
     async fn send_state_to_players(&self, room_id: &RoomId) {
         let room = self.rooms.get(room_id).unwrap();
-        for player in room.players.iter() {
-            let view = self.get_game_view(&room_id, *player);
-            self.player_channels
-                .get(player)
-                .unwrap()
-                .send(serde_json::to_string(&view).unwrap())
+        for (player_id, player_state) in room.players.iter() {
+            let view = self.get_game_view(&room_id, *player_id);
+            player_state
+                .tx
+                .send(view)
                 .await
                 // Ignore send errors; player could have dropped.
                 .ok();
@@ -80,15 +147,21 @@ async fn handle_client_connection(
     {
         let mut gs = global_state.lock().await;
         player_id = gs.get_new_player_id();
-        gs.player_channels.insert(player_id, tx);
         let room = gs.rooms.entry(room_id.clone()).or_default();
-        room.players.push(player_id);
+        if room.players.len() == 2 {
+            // Ignore error as player could have disconnected
+            ws.send(Message::text("room full")).await.ok();
+            return;
+        }
+        room.players
+            .insert(player_id, PlayerState { tx, choice: None });
         gs.send_state_to_players(&room_id).await;
     }
     loop {
         tokio::select! {
             msg = rx.recv() => match msg {
                 Some(msg) => {
+                    let msg = serde_json::to_string(&msg).unwrap();
                     if let Err(err) = ws.send(Message::text(msg)).await {
                         eprintln!("Error sending message to client: {}", err);
                         break
@@ -99,6 +172,36 @@ async fn handle_client_connection(
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
+                    match msg.to_str() {
+                        Ok(msg) => match serde_json::from_str(msg) {
+                            Ok(command) => {
+                                let command: Command = command;
+                                match command {
+                                    Command::Choice(choice) => {
+                                        let mut gs = global_state.lock().await;
+                                        let room = gs.rooms.get_mut(&room_id).unwrap();
+                                        room.players.get_mut(&player_id).unwrap().choice = Some(choice);
+                                        let choices = room.players.iter().map(|(id, state)| (id, state.choice)).collect::<Vec<_>>();
+                                        if choices.iter().all(|(_id, choice)| choice.is_some()) {
+                                            room.history.push(choices.iter().map(|(id, choice)| (**id, choice.unwrap())).collect());
+                                            // clear choices
+                                            for (_player_id, mut player_state) in room.players.iter_mut() {
+                                                player_state.choice = None;
+                                            }
+                                        }
+                                        gs.send_state_to_players(&room_id).await;
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                eprintln!("Bad message: {:?}: {:?}", msg, e);
+                                continue;
+                            },
+                        }
+                        Err(()) => {
+                            eprintln!("Bad message: {:?}", msg);
+                        },
+                    }
                     eprintln!("Got message: {:?}", msg);
                 },
                 Some(Err(err)) => {
@@ -116,8 +219,7 @@ async fn handle_client_connection(
         // cleanup
         let mut gs = global_state.lock().await;
         let room = gs.rooms.get_mut(&room_id).unwrap();
-        room.players
-            .remove(room.players.iter().position(|x| *x == player_id).unwrap());
+        room.players.remove(&player_id);
         if room.players.is_empty() {
             gs.rooms.remove(&room_id);
         }
