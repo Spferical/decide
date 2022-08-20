@@ -11,7 +11,8 @@
             status.innerHTML = '<p><em>Disconnected from server! Try refreshing.</em></p>';
         };
         ws.onmessage = function(msg) {
-            alert(msg.data)
+            console.log("Got ws message: " + msg.data);
+            status.innerHTML = '<p>' + msg.data + '</p>'
         };
     }
   </script>

@@ -4,52 +4,90 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::{mpsc, Mutex};
 use warp::{
     ws::{Message, WebSocket},
-    Filter, Rejection, Reply,
+    Filter, Rejection,
 };
 
 type WebResult<T> = std::result::Result<T, Rejection>;
 
-struct PlayerComm {
-    to_player: mpsc::Sender<String>,
-    from_player: mpsc::Receiver<()>,
-}
+/// Each player represents a single websocket connection.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct PlayerId(u64);
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct RoomId(String);
 
 #[derive(Default)]
 struct Game {
-    player1: Option<PlayerComm>,
-    player2: Option<PlayerComm>,
+    players: Vec<PlayerId>,
+}
+
+/// Representation of game state sent to a player.
+#[derive(serde::Serialize)]
+struct GameView {
+    num_players: u64,
+}
+
+struct GlobalState {
+    rooms: HashMap<RoomId, Game>,
+    player_channels: HashMap<PlayerId, mpsc::Sender<String>>,
+    next_player_id: u64,
+}
+
+impl GlobalState {
+    fn new() -> Self {
+        Self {
+            rooms: HashMap::new(),
+            player_channels: HashMap::new(),
+            next_player_id: 1,
+        }
+    }
+
+    fn get_new_player_id(&mut self) -> PlayerId {
+        self.next_player_id += 1;
+        PlayerId(self.next_player_id - 1)
+    }
+
+    fn get_game_view(&self, room: &RoomId, _id: PlayerId) -> GameView {
+        let game = self.rooms.get(&room).unwrap();
+        GameView {
+            num_players: game.players.len() as u64,
+        }
+    }
+
+    async fn send_state_to_players(&self, room_id: &RoomId) {
+        let room = self.rooms.get(room_id).unwrap();
+        for player in room.players.iter() {
+            let view = self.get_game_view(&room_id, *player);
+            self.player_channels
+                .get(player)
+                .unwrap()
+                .send(serde_json::to_string(&view).unwrap())
+                .await
+                // Ignore send errors; player could have dropped.
+                .ok();
+        }
+    }
 }
 
 async fn handle_client_connection(
-    rooms: Arc<Mutex<HashMap<String, Game>>>,
-    id: String,
+    global_state: Arc<Mutex<GlobalState>>,
+    room_id: String,
     mut ws: WebSocket,
 ) {
-    let (tx1, mut rx1) = mpsc::channel(1);
-    let (tx2, rx2) = mpsc::channel(1);
-    let player_idx;
+    let (tx, mut rx) = mpsc::channel(1);
+    let room_id = RoomId(room_id);
+    let player_id;
     {
-        let mut rooms = rooms.lock().await;
-        let game = rooms.entry(id.clone()).or_default();
-        let comm = PlayerComm {
-            to_player: tx1,
-            from_player: rx2,
-        };
-        player_idx = if game.player1.is_none() {
-            game.player1 = Some(comm);
-            1
-        } else if game.player2.is_none() {
-            game.player2 = Some(comm);
-            2
-        } else {
-            eprintln!("Room full!");
-            ws.send(Message::text("room full")).await.unwrap();
-            return;
-        };
+        let mut gs = global_state.lock().await;
+        player_id = gs.get_new_player_id();
+        gs.player_channels.insert(player_id, tx);
+        let room = gs.rooms.entry(room_id.clone()).or_default();
+        room.players.push(player_id);
+        gs.send_state_to_players(&room_id).await;
     }
     loop {
         tokio::select! {
-            msg = rx1.recv() => match msg {
+            msg = rx.recv() => match msg {
                 Some(msg) => {
                     if let Err(err) = ws.send(Message::text(msg)).await {
                         eprintln!("Error sending message to client: {}", err);
@@ -76,24 +114,24 @@ async fn handle_client_connection(
     }
     {
         // cleanup
-        let mut rooms = rooms.lock().await;
-        let game = rooms.get_mut(&id).unwrap();
-        match player_idx {
-            1 => game.player1.take(),
-            2 => game.player2.take(),
-            _ => unreachable!(),
-        };
+        let mut gs = global_state.lock().await;
+        let room = gs.rooms.get_mut(&room_id).unwrap();
+        room.players
+            .remove(room.players.iter().position(|x| *x == player_id).unwrap());
+        if room.players.is_empty() {
+            gs.rooms.remove(&room_id);
+        }
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let rooms = Arc::new(Mutex::new(HashMap::<String, Game>::new()));
-    let with_rooms = warp::any().map(move || rooms.clone());
+    let global_state = Arc::new(Mutex::new(GlobalState::new()));
+    let with_global_state = warp::any().map(move || global_state.clone());
     let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}!", name));
     let ws_route = warp::path!(String)
         .and(warp::ws())
-        .and(with_rooms)
+        .and(with_global_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
             WebResult::Ok(ws.on_upgrade(|ws| handle_client_connection(rooms, room_id, ws)))
         });
