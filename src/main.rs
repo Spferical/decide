@@ -10,7 +10,7 @@ use warp::{
 type WebResult<T> = std::result::Result<T, Rejection>;
 
 struct PlayerComm {
-    to_player: mpsc::Sender<()>,
+    to_player: mpsc::Sender<String>,
     from_player: mpsc::Receiver<()>,
 }
 
@@ -25,16 +25,17 @@ async fn handle_client_connection(
     id: String,
     mut ws: WebSocket,
 ) {
-    let (tx1, rx1) = mpsc::channel(1);
+    let (tx1, mut rx1) = mpsc::channel(1);
     let (tx2, rx2) = mpsc::channel(1);
+    let player_idx;
     {
         let mut rooms = rooms.lock().await;
-        let game = rooms.entry(id).or_default();
+        let game = rooms.entry(id.clone()).or_default();
         let comm = PlayerComm {
             to_player: tx1,
             from_player: rx2,
         };
-        let player_idx = if game.player1.is_none() {
+        player_idx = if game.player1.is_none() {
             game.player1 = Some(comm);
             1
         } else if game.player2.is_none() {
@@ -48,12 +49,22 @@ async fn handle_client_connection(
     }
     loop {
         tokio::select! {
+            msg = rx1.recv() => match msg {
+                Some(msg) => {
+                    if let Err(err) = ws.send(Message::text(msg)).await {
+                        eprintln!("Error sending message to client: {}", err);
+                        break
+                    }
+                },
+                // server must be shutting down
+                None => break,
+            },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
                     eprintln!("Got message: {:?}", msg);
                 },
                 Some(Err(err)) => {
-                    eprintln!("Error: {}", err);
+                    eprintln!("Error reading client response: {}", err);
                     break
                 },
                 None => {
@@ -62,6 +73,16 @@ async fn handle_client_connection(
                 },
             }
         }
+    }
+    {
+        // cleanup
+        let mut rooms = rooms.lock().await;
+        let game = rooms.get_mut(&id).unwrap();
+        match player_idx {
+            1 => game.player1.take(),
+            2 => game.player2.take(),
+            _ => unreachable!(),
+        };
     }
 }
 

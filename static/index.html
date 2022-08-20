@@ -9,7 +9,10 @@
         };
         ws.onclose = function() {
             status.innerHTML = '<p><em>Disconnected from server! Try refreshing.</em></p>';
-        }
+        };
+        ws.onmessage = function(msg) {
+            alert(msg.data)
+        };
     }
   </script>
   <body onload="init()">
