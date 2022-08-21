@@ -24,7 +24,8 @@ enum Choice {
     Scissors,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 enum GameOutcome {
     Win,
     Loss,
@@ -46,7 +47,7 @@ impl Choice {
 }
 
 struct PlayerState {
-    tx: mpsc::Sender<RoomView>,
+    tx: mpsc::Sender<ClientNotification>,
     choice: Option<Choice>,
 }
 
@@ -56,12 +57,32 @@ struct Room {
     history: Vec<HashMap<PlayerId, Choice>>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ClientStatus {
+    Connected,
+    RoomFull,
+}
+
+/// Data serialized and sent to the client in response to a command or other change in state.
+#[derive(serde::Serialize)]
+struct ClientNotification {
+    status: ClientStatus,
+    room_state: Option<RoomView>,
+}
+
+#[derive(serde::Serialize)]
+struct HistoryEntryView {
+    outcome: GameOutcome,
+    choices: Vec<Choice>,
+}
+
 /// Representation of room state sent to a player.
 #[derive(serde::Serialize)]
 struct RoomView {
     num_players: u64,
     choice: Option<Choice>,
-    history: Vec<(Choice, Choice)>,
+    history: Vec<HistoryEntryView>,
     wins: u64,
     draws: u64,
     losses: u64,
@@ -101,17 +122,20 @@ impl GlobalState {
                 let player_choice = choices.remove(&player_id).unwrap();
                 // assuming only one other rps player
                 let other_choice = *choices.iter().next().unwrap().1;
-                (player_choice, other_choice)
+                let outcome = player_choice.get_outcome(other_choice);
+                HistoryEntryView {
+                    outcome,
+                    choices: vec![player_choice, other_choice],
+                }
             })
             .collect::<Vec<_>>();
-        let (wins, losses, draws) =
-            history
-                .iter()
-                .fold((0, 0, 0), |(w, l, d), (a, b)| match a.get_outcome(*b) {
-                    GameOutcome::Win => (w + 1, l, d),
-                    GameOutcome::Loss => (w, l + 1, d),
-                    GameOutcome::Draw => (w, l, d + 1),
-                });
+        let (wins, losses, draws) = history
+            .iter()
+            .fold((0, 0, 0), |(w, l, d), entry| match entry.outcome {
+                GameOutcome::Win => (w + 1, l, d),
+                GameOutcome::Loss => (w, l + 1, d),
+                GameOutcome::Draw => (w, l, d + 1),
+            });
         RoomView {
             num_players: room.players.len() as u64,
             choice: room.players.get(&player_id).unwrap().choice,
@@ -128,7 +152,10 @@ impl GlobalState {
             let view = self.get_game_view(&room_id, *player_id);
             player_state
                 .tx
-                .send(view)
+                .send(ClientNotification {
+                    room_state: Some(view),
+                    status: ClientStatus::Connected,
+                })
                 .await
                 // Ignore send errors; player could have dropped.
                 .ok();
@@ -150,11 +177,20 @@ async fn handle_client_connection(
         let room = gs.rooms.entry(room_id.clone()).or_default();
         if room.players.len() == 2 {
             // Ignore error as player could have disconnected
-            ws.send(Message::text("room full")).await.ok();
+            ws.send(Message::text(
+                serde_json::to_string(&ClientNotification {
+                    status: ClientStatus::RoomFull,
+                    room_state: None,
+                })
+                .unwrap(),
+            ))
+            .await
+            .ok();
             return;
         }
         room.players
             .insert(player_id, PlayerState { tx, choice: None });
+        room.history.clear();
         gs.send_state_to_players(&room_id).await;
     }
     let on_command = |global_state: Arc<Mutex<GlobalState>>, room_id, player_id, command| {
