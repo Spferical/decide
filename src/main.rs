@@ -192,7 +192,7 @@ async fn handle_client_connection(
                 Some(msg) => {
                     let msg = serde_json::to_string(&msg).unwrap();
                     if let Err(err) = ws.send(Message::text(msg)).await {
-                        eprintln!("Error sending message to client: {}", err);
+                        log::debug!("Error sending message to client: {}", err);
                         break
                     }
                 },
@@ -209,7 +209,6 @@ async fn handle_client_connection(
                     match msg.to_str() {
                         Ok(msg) => match serde_json::from_str(msg) {
                             Ok(command) => {
-                                let command: Command = command;
                                 on_command(
                                     global_state.clone(),
                                     room_id.clone(),
@@ -219,22 +218,22 @@ async fn handle_client_connection(
                                 .await;
                             },
                             Err(e) => {
-                                eprintln!("Bad message: {:?}: {:?}", msg, e);
+                                log::debug!("Bad message: {:?}: {:?}", msg, e);
                                 continue;
                             },
                         }
                         Err(()) => {
-                            eprintln!("Bad message: {:?}", msg);
+                            log::debug!("Bad message: {:?}", msg);
                         },
                     }
-                    eprintln!("Got message: {:?}", msg);
+                    log::debug!("Got message: {:?}", msg);
                 },
                 Some(Err(err)) => {
-                    eprintln!("Error reading client response: {}", err);
+                    log::debug!("Error reading client response: {}", err);
                     break
                 },
                 None => {
-                    eprintln!("Client disconnected.");
+                    log::debug!("Client disconnected.");
                     break
                 },
             }
@@ -253,6 +252,7 @@ async fn handle_client_connection(
 
 #[tokio::main]
 async fn main() {
+    pretty_env_logger::init_timed();
     let global_state = Arc::new(Mutex::new(GlobalState::new()));
     let with_global_state = warp::any().map(move || global_state.clone());
     let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}!", name));
