@@ -205,6 +205,9 @@ async fn handle_client_connection(
                         .iter()
                         .map(|(id, state)| (id, state.choice))
                         .collect::<Vec<_>>();
+                    if choices.len() <= 2 {
+                        return;
+                    }
                     if choices.iter().all(|(_id, choice)| choice.is_some()) {
                         room.history.push(
                             choices
