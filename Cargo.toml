@@ -1,5 +1,5 @@
 [package]
-name = "rps"
+name = "decide"
 version = "0.1.0"
 edition = "2021"
 authors = ["Matthew Pfeiffer <spferical@gmail.com>"]

@@ -1,8 +1,8 @@
 from rust:1.63 as builder
 
 # cache dependencies by building project without source code
-run cargo new --bin rps
-workdir ./rps 
+run cargo new --bin choose
+workdir ./choose
 copy ./Cargo.lock ./Cargo.lock
 copy ./Cargo.toml ./Cargo.toml
 run cargo build --release
@@ -10,15 +10,15 @@ run cargo build --release
 # then, build the real application
 run rm src/*.rs
 add . ./
-run rm ./target/release/deps/rps-*
+run rm ./target/release/deps/decide-*
 run cargo install --path .
 
 FROM debian:buster-slim
-COPY --from=builder /usr/local/cargo/bin/rps /usr/local/bin/rps
+COPY --from=builder /usr/local/cargo/bin/decide /usr/local/bin/decide
 
-run groupadd rps && useradd -g rps rps
-user rps
+run groupadd decide && useradd -g decide decide
+user decide
 
 expose 8000
 
-cmd ["rps", "0.0.0.0:8000"]
+cmd ["decide", "0.0.0.0:8000"]
