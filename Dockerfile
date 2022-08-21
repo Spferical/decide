@@ -3,6 +3,7 @@ from rust:1.63 as builder
 # cache dependencies by building project without source code
 run cargo new --bin rps
 workdir ./rps 
+copy ./Cargo.lock ./Cargo.lock
 copy ./Cargo.toml ./Cargo.toml
 run cargo build --release
 
