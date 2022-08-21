@@ -157,6 +157,35 @@ async fn handle_client_connection(
             .insert(player_id, PlayerState { tx, choice: None });
         gs.send_state_to_players(&room_id).await;
     }
+    let on_command = |global_state: Arc<Mutex<GlobalState>>, room_id, player_id, command| {
+        async move {
+            match command {
+                Command::Choice(choice) => {
+                    let mut gs = global_state.lock().await;
+                    let room = gs.rooms.get_mut(&room_id).unwrap();
+                    room.players.get_mut(&player_id).unwrap().choice = Some(choice);
+                    let choices = room
+                        .players
+                        .iter()
+                        .map(|(id, state)| (id, state.choice))
+                        .collect::<Vec<_>>();
+                    if choices.iter().all(|(_id, choice)| choice.is_some()) {
+                        room.history.push(
+                            choices
+                                .iter()
+                                .map(|(id, choice)| (**id, choice.unwrap()))
+                                .collect(),
+                        );
+                        // clear choices
+                        for (_player_id, mut player_state) in room.players.iter_mut() {
+                            player_state.choice = None;
+                        }
+                    }
+                    gs.send_state_to_players(&room_id).await;
+                }
+            }
+        }
+    };
     loop {
         tokio::select! {
             msg = rx.recv() => match msg {
@@ -172,26 +201,22 @@ async fn handle_client_connection(
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
+                    if msg.is_ping() {
+                        if let Err(_) = ws.send(Message::pong("")).await {
+                            break;
+                        }
+                    }
                     match msg.to_str() {
                         Ok(msg) => match serde_json::from_str(msg) {
                             Ok(command) => {
                                 let command: Command = command;
-                                match command {
-                                    Command::Choice(choice) => {
-                                        let mut gs = global_state.lock().await;
-                                        let room = gs.rooms.get_mut(&room_id).unwrap();
-                                        room.players.get_mut(&player_id).unwrap().choice = Some(choice);
-                                        let choices = room.players.iter().map(|(id, state)| (id, state.choice)).collect::<Vec<_>>();
-                                        if choices.iter().all(|(_id, choice)| choice.is_some()) {
-                                            room.history.push(choices.iter().map(|(id, choice)| (**id, choice.unwrap())).collect());
-                                            // clear choices
-                                            for (_player_id, mut player_state) in room.players.iter_mut() {
-                                                player_state.choice = None;
-                                            }
-                                        }
-                                        gs.send_state_to_players(&room_id).await;
-                                    }
-                                }
+                                on_command(
+                                    global_state.clone(),
+                                    room_id.clone(),
+                                    player_id,
+                                    command
+                                )
+                                .await;
                             },
                             Err(e) => {
                                 eprintln!("Bad message: {:?}: {:?}", msg, e);
