@@ -10,13 +10,13 @@ use warp::{
 type WebResult<T> = std::result::Result<T, Rejection>;
 
 /// Each websocket connection is a unique player.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct PlayerId(u64);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct RoomId(String);
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Choice {
     Rock,
@@ -197,6 +197,7 @@ async fn handle_client_connection(
         async move {
             match command {
                 Command::Choice(choice) => {
+                    log::debug!("Player {player_id:?} chose {choice:?}");
                     let mut gs = global_state.lock().await;
                     let room = gs.rooms.get_mut(&room_id).unwrap();
                     room.players.get_mut(&player_id).unwrap().choice = Some(choice);
@@ -205,10 +206,12 @@ async fn handle_client_connection(
                         .iter()
                         .map(|(id, state)| (id, state.choice))
                         .collect::<Vec<_>>();
-                    if choices.len() <= 2 {
+                    log::debug!("Choices: {choices:?}");
+                    if choices.len() < 2 {
                         return;
                     }
                     if choices.iter().all(|(_id, choice)| choice.is_some()) {
+                        log::debug!("Everyone chose");
                         room.history.push(
                             choices
                                 .iter()
@@ -240,6 +243,7 @@ async fn handle_client_connection(
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
+                    log::debug!("Got message: {:?}", msg);
                     if msg.is_ping() {
                         if let Err(_) = ws.send(Message::pong("")).await {
                             break;
@@ -265,7 +269,6 @@ async fn handle_client_connection(
                             log::debug!("Bad message: {:?}", msg);
                         },
                     }
-                    log::debug!("Got message: {:?}", msg);
                 },
                 Some(Err(err)) => {
                     log::debug!("Error reading client response: {}", err);
