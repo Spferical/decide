@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::{mpsc, Mutex};
@@ -289,6 +289,20 @@ async fn handle_client_connection(
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init_timed();
+    let addr = match std::env::args().nth(1) {
+        Some(addr) => addr,
+        None => {
+            log::error!("Pass in server url as first argument.");
+            return;
+        }
+    };
+    let addr = match addr.parse::<SocketAddr>() {
+        Ok(addr) => addr,
+        Err(e) => {
+            log::error!("Invalid URL: {}: {}", addr, e);
+            return;
+        }
+    };
     let global_state = Arc::new(Mutex::new(GlobalState::new()));
     let with_global_state = warp::any().map(move || global_state.clone());
     let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}!", name));
@@ -299,5 +313,5 @@ async fn main() {
             WebResult::Ok(ws.on_upgrade(|ws| handle_client_connection(rooms, room_id, ws)))
         });
     let routes = hello.or(warp::fs::dir("static")).or(ws_route);
-    warp::serve(routes).run(([127, 0, 0, 1], 8000)).await
+    warp::serve(routes).run(addr).await
 }
