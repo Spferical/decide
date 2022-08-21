@@ -63,6 +63,8 @@
             if (state.status != "room_full") {
                 state.status = "disconnected";
                 elements.status.innerHTML = '<em>Disconnected from server! Try refreshing.</em>';
+                elements.status.style.color = "red";
+                elements.num_players_outer.hidden = true;
             }
         };
         ws.onmessage = function(msg) {
