@@ -9,7 +9,7 @@ run cargo build --release
 
 # then, build the real application
 run rm src/*.rs
-add . ./
+add ./src ./src
 run rm ./target/release/deps/decide-*
 run cargo install --path .
 
@@ -22,4 +22,4 @@ user decide
 
 expose 8000
 
-cmd ["decide", "0.0.0.0:8000"]
+cmd ["/usr/local/bin/decide", "0.0.0.0:8000"]

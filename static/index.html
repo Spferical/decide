@@ -27,7 +27,13 @@
         elements.status = document.getElementById("status");
         elements.num_players_outer = document.getElementById("num_players_outer");
 
-        const uri = 'ws://' + location.host + '/ws/' + room;
+        var ws_protocol;
+        if (window.location.protocol != "https:") {
+            ws_protocol = "ws://";
+        } else {
+            ws_protocol = "wss://";
+        }
+        const uri = ws_protocol + location.host + '/ws/' + room;
         const ws = new WebSocket(uri);
         var state = {"status": "connecting"};
         ws.onopen = function() {
