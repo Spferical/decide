@@ -1,8 +1,8 @@
 from rust:1.63 as builder
 
 # cache dependencies by building project without source code
-run cargo new --bin choose
-workdir ./choose
+run cargo new --bin decide
+workdir ./decide
 copy ./Cargo.lock ./Cargo.lock
 copy ./Cargo.toml ./Cargo.toml
 run cargo build --release
@@ -15,6 +15,7 @@ run cargo install --path .
 
 FROM debian:buster-slim
 COPY --from=builder /usr/local/cargo/bin/decide /usr/local/bin/decide
+copy static static
 
 run groupadd decide && useradd -g decide decide
 user decide
