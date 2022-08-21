@@ -9,7 +9,7 @@ use warp::{
 
 type WebResult<T> = std::result::Result<T, Rejection>;
 
-/// Each player represents a single websocket connection.
+/// Each websocket connection is a unique player.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct PlayerId(u64);
 
@@ -306,7 +306,7 @@ async fn main() {
     let global_state = Arc::new(Mutex::new(GlobalState::new()));
     let with_global_state = warp::any().map(move || global_state.clone());
     let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}!", name));
-    let ws_route = warp::path!(String)
+    let ws_route = warp::path!("ws" / String)
         .and(warp::ws())
         .and(with_global_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {

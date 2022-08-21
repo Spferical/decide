@@ -28,6 +28,14 @@
   </head>
   <script>
     function init() {
+        var url = new URL(document.location);
+        var room = url.searchParams.get('room');
+        if (room == null) {
+            room = crypto.randomUUID().substr(0, 5);
+            url.searchParams.append('room', room);
+            document.location = url.toString();
+        }
+
         var elements = {};
         elements.buttons = {}
         elements.buttons = ["rock", "paper", "scissors"].map(
@@ -45,7 +53,7 @@
         elements.status = document.getElementById("status");
         elements.num_players_outer = document.getElementById("num_players_outer");
 
-        const uri = 'ws://' + location.host + '/ws';
+        const uri = 'ws://' + location.host + '/ws/' + room;
         const ws = new WebSocket(uri);
         var state = {"status": "connecting"};
         ws.onopen = function() {
