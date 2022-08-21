@@ -285,6 +285,8 @@ async fn handle_client_connection(
         room.players.remove(&player_id);
         if room.players.is_empty() {
             gs.rooms.remove(&room_id);
+        } else {
+            gs.send_state_to_players(&room_id).await;
         }
     }
 }
