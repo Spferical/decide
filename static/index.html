@@ -52,6 +52,7 @@
             console.log(new_state);
             if (new_state.status == "room_full") {
                 elements.status.innerHTML = "Failed to join: room is full!";
+                state = new_state;
                 return;
             } else if (new_state.status == "connected") {
                 elements.status.innerHTML = "Connected!";
