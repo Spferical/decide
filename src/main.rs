@@ -82,6 +82,7 @@ struct HistoryEntryView {
 struct RoomView {
     num_players: u64,
     choice: Option<Choice>,
+    opponent_chosen: bool,
     history: Vec<HistoryEntryView>,
     wins: u64,
     draws: u64,
@@ -136,9 +137,15 @@ impl GlobalState {
                 GameOutcome::Loss => (w, l + 1, d),
                 GameOutcome::Draw => (w, l, d + 1),
             });
+        let opponent_chosen = room
+            .players
+            .iter()
+            .find(|(id, p)| **id != player_id && p.choice.is_some())
+            .is_some();
         RoomView {
             num_players: room.players.len() as u64,
             choice: room.players.get(&player_id).unwrap().choice,
+            opponent_chosen,
             history,
             wins,
             losses,

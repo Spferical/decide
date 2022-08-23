@@ -18,7 +18,7 @@
         [
             "status", "num_players_outer", "history_outer", "choice_outer",
              "num_players", "history", "choice", "stats_outer", "wins",
-             "losses", "draws", "buttons"
+             "losses", "draws", "buttons", "opponent_status"
         ].forEach(
             name => {
                 elements[name] = document.getElementById(name);
@@ -36,9 +36,6 @@
         const uri = ws_protocol + location.host + '/ws/' + room;
         const ws = new WebSocket(uri);
         var state = {"status": "connecting"};
-        ws.onopen = function() {
-            elements.status.innerHTML = '<p><em>Waiting for opponent...</em></p>';
-        };
         ws.onclose = function() {
             if (state.status != "room_full") {
                 state.status = "disconnected";
@@ -60,6 +57,14 @@
             elements.num_players.innerHTML = new_state.room_state.num_players;
             elements.num_players_outer.hidden = false;
             elements.buttons.hidden = (new_state.room_state.num_players <= 1);
+            elements.opponent_status.hidden = (new_state.room_state.num_players <= 1);
+            if (new_state.room_state.num_players > 1) {
+                if (new_state.room_state.opponent_chosen) {
+                    elements.opponent_status.innerHTML = "Opponent has selected a choice.";
+                } else {
+                    elements.opponent_status.innerHTML = "Waiting for opponent...";
+                }
+            }
             if (new_state.room_state.history.length == 0) {
                 elements.history_outer.hidden = true;
             } else {
@@ -102,6 +107,7 @@
       <a href="#" role="button" id="scissors">scissors</a>
     </div>
     <div hidden id="choice_outer">You have selected: <span id="choice">N/A</span>.</div>
+    <div hidden id="opponent_status"></div>
     <div id="status">Not connected.</div>
     <div hidden id="num_players_outer">There are <span id="num_players">0</span> players connected.</div>
     <div hidden id="stats_outer">Wins: <span id="wins">0</span> Losses: <span id="losses">0</span> Draws: <span id="draws">0</span></div>
