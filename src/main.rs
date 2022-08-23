@@ -97,6 +97,7 @@ struct SpectatorView {
 #[derive(serde::Serialize)]
 struct RoomView {
     num_players: u64,
+    num_spectators: u64,
     history: Vec<Vec<Choice>>,
     player_view: Option<PlayerView>,
     spectator_view: Option<SpectatorView>,
@@ -183,8 +184,11 @@ impl RpsState {
                 draws,
             })
         };
+        let num_players = room.players.len() as u64;
+        let num_spectators = room.clients.len() as u64 - num_players;
         RoomView {
-            num_players: room.players.len() as u64,
+            num_players,
+            num_spectators,
             history,
             player_view,
             spectator_view,

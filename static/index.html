@@ -19,7 +19,8 @@
             "status", "num_players_outer", "history_outer", "choice_outer",
              "num_players", "history", "choice", "stats_outer", "wins",
              "losses", "draws", "buttons", "opponent_status",
-             "spectator_stats_outer", "spectator_wins", "spectator_draws"
+             "spectator_stats_outer", "spectator_wins", "spectator_draws",
+             "num_spectators"
         ].forEach(
             name => {
                 elements[name] = document.getElementById(name);
@@ -60,6 +61,7 @@
             }
 
             elements.num_players.innerHTML = new_state.room_state.num_players;
+            elements.num_spectators.innerHTML = new_state.room_state.num_spectators;
             elements.num_players_outer.hidden = false;
 
             elements.buttons.hidden = !is_player;
@@ -129,7 +131,7 @@
     <div hidden id="stats_outer">Wins: <span id="wins">0</span> Losses: <span id="losses">0</span> Draws: <span id="draws">0</span></div>
     <div hidden id="spectator_stats_outer">Wins: <span id="spectator_wins">0 0</span> Draws: <span id="spectator_draws">0</span></div>
 
-    <div hidden id="num_players_outer">There are <span id="num_players">0</span> players connected.</div>
+    <div hidden id="num_players_outer">There are <span id="num_players">0</span> players and <span id="num_spectators">0</span> spectators.</div>
     <div hidden id="history_outer">Game history:<span id="history"></span></div>
   </body>
 </html>
