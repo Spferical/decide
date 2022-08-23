@@ -33,7 +33,7 @@
         } else {
             ws_protocol = "wss://";
         }
-        const uri = ws_protocol + location.host + '/ws/' + room;
+        const uri = ws_protocol + location.host + '/rps/ws/' + room;
         const ws = new WebSocket(uri);
         var state = {"status": "connecting"};
         ws.onclose = function() {

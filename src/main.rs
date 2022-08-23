@@ -95,12 +95,12 @@ enum Command {
     Choice(Choice),
 }
 
-struct GlobalState {
+struct RpsState {
     rooms: HashMap<RoomId, Room>,
     next_player_id: u64,
 }
 
-impl GlobalState {
+impl RpsState {
     fn new() -> Self {
         Self {
             rooms: HashMap::new(),
@@ -170,8 +170,8 @@ impl GlobalState {
     }
 }
 
-async fn handle_client_connection(
-    global_state: Arc<Mutex<GlobalState>>,
+async fn handle_rps_client(
+    global_state: Arc<Mutex<RpsState>>,
     room_id: String,
     mut ws: WebSocket,
 ) {
@@ -200,7 +200,7 @@ async fn handle_client_connection(
         room.history.clear();
         gs.send_state_to_players(&room_id).await;
     }
-    let on_command = |global_state: Arc<Mutex<GlobalState>>, room_id, player_id, command| {
+    let on_command = |global_state: Arc<Mutex<RpsState>>, room_id, player_id, command| {
         async move {
             match command {
                 Command::Choice(choice) => {
@@ -318,14 +318,14 @@ async fn main() {
             return;
         }
     };
-    let global_state = Arc::new(Mutex::new(GlobalState::new()));
+    let global_state = Arc::new(Mutex::new(RpsState::new()));
     let with_global_state = warp::any().map(move || global_state.clone());
     let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}!", name));
-    let ws_route = warp::path!("ws" / String)
+    let ws_route = warp::path!("rps" / "ws" / String)
         .and(warp::ws())
         .and(with_global_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
-            WebResult::Ok(ws.on_upgrade(|ws| handle_client_connection(rooms, room_id, ws)))
+            WebResult::Ok(ws.on_upgrade(|ws| handle_rps_client(rooms, room_id, ws)))
         });
     let routes = hello.or(warp::fs::dir("static")).or(ws_route);
     warp::serve(routes).run(addr).await
