@@ -11,7 +11,7 @@ type WebResult<T> = std::result::Result<T, Rejection>;
 
 /// Each websocket connection is a unique player.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct PlayerId(u64);
+struct ClientId(u64);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct RoomId(String);
@@ -47,21 +47,24 @@ impl Choice {
 }
 
 struct PlayerState {
-    tx: mpsc::Sender<ClientNotification>,
     choice: Option<Choice>,
+}
+
+struct ClientInfo {
+    tx: mpsc::Sender<ClientNotification>,
 }
 
 #[derive(Default)]
 struct Room {
-    players: HashMap<PlayerId, PlayerState>,
-    history: Vec<HashMap<PlayerId, Choice>>,
+    clients: HashMap<ClientId, ClientInfo>,
+    players: HashMap<ClientId, PlayerState>,
+    history: Vec<HashMap<ClientId, Choice>>,
 }
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 enum ClientStatus {
     Connected,
-    RoomFull,
 }
 
 /// Data serialized and sent to the client in response to a command or other change in state.
@@ -71,22 +74,32 @@ struct ClientNotification {
     room_state: Option<RoomView>,
 }
 
+// State sent only to players.
 #[derive(serde::Serialize)]
-struct HistoryEntryView {
-    outcome: GameOutcome,
-    choices: Vec<Choice>,
-}
-
-/// Representation of room state sent to a player.
-#[derive(serde::Serialize)]
-struct RoomView {
-    num_players: u64,
+struct PlayerView {
     choice: Option<Choice>,
     opponent_chosen: bool,
-    history: Vec<HistoryEntryView>,
+    outcome_history: Vec<GameOutcome>,
     wins: u64,
     draws: u64,
     losses: u64,
+}
+
+// State sent only to spectators.
+#[derive(serde::Serialize)]
+struct SpectatorView {
+    player_wins: Vec<u64>,
+    player_chosen: Vec<bool>,
+    draws: u64,
+}
+
+/// Representation of room state sent to a client.
+#[derive(serde::Serialize)]
+struct RoomView {
+    num_players: u64,
+    history: Vec<Vec<Choice>>,
+    player_view: Option<PlayerView>,
+    spectator_view: Option<SpectatorView>,
 }
 
 #[derive(serde::Deserialize)]
@@ -97,67 +110,92 @@ enum Command {
 
 struct RpsState {
     rooms: HashMap<RoomId, Room>,
-    next_player_id: u64,
+    next_client_id: u64,
 }
 
 impl RpsState {
     fn new() -> Self {
         Self {
             rooms: HashMap::new(),
-            next_player_id: 1,
+            next_client_id: 1,
         }
     }
 
-    fn get_new_player_id(&mut self) -> PlayerId {
-        self.next_player_id += 1;
-        PlayerId(self.next_player_id - 1)
+    fn get_new_client_id(&mut self) -> ClientId {
+        self.next_client_id += 1;
+        ClientId(self.next_client_id - 1)
     }
 
-    fn get_game_view(&self, room_id: &RoomId, player_id: PlayerId) -> RoomView {
+    fn get_game_view(&self, room_id: &RoomId, client_id: ClientId) -> RoomView {
         let room = self.rooms.get(&room_id).unwrap();
-        let history = room
+        let history: Vec<Vec<Choice>> = room
             .history
             .iter()
+            .cloned()
             .map(|choices| {
-                let mut choices = choices.clone();
-                let player_choice = choices.remove(&player_id).unwrap();
-                // assuming only one other rps player
-                let other_choice = *choices.iter().next().unwrap().1;
-                let outcome = player_choice.get_outcome(other_choice);
-                HistoryEntryView {
-                    outcome,
-                    choices: vec![player_choice, other_choice],
-                }
+                let mut choices = choices.into_iter().collect::<Vec<_>>();
+                // If client is a player, sort his choices first.
+                choices.sort_by_key(|(id, _)| if *id == client_id { 1 } else { 2 });
+                choices.into_iter().map(|(_id, choice)| choice).collect()
             })
-            .collect::<Vec<_>>();
-        let (wins, losses, draws) = history
-            .iter()
-            .fold((0, 0, 0), |(w, l, d), entry| match entry.outcome {
-                GameOutcome::Win => (w + 1, l, d),
-                GameOutcome::Loss => (w, l + 1, d),
-                GameOutcome::Draw => (w, l, d + 1),
+            .collect();
+        let player_view = room.players.get(&client_id).map(|player_state| {
+            let outcome_history = history
+                .iter()
+                .map(|choices| choices[0].get_outcome(choices[1]))
+                .collect();
+            let opponent_chosen = room
+                .players
+                .iter()
+                .find(|(id, p)| **id != client_id && p.choice.is_some())
+                .is_some();
+            let (wins, losses, draws) = history.iter().fold((0, 0, 0), |(w, l, d), choices| {
+                match choices[0].get_outcome(choices[1]) {
+                    GameOutcome::Win => (w + 1, l, d),
+                    GameOutcome::Loss => (w, l + 1, d),
+                    GameOutcome::Draw => (w, l, d + 1),
+                }
             });
-        let opponent_chosen = room
-            .players
-            .iter()
-            .find(|(id, p)| **id != player_id && p.choice.is_some())
-            .is_some();
+            PlayerView {
+                choice: player_state.choice,
+                opponent_chosen,
+                outcome_history,
+                wins,
+                losses,
+                draws,
+            }
+        });
+        let spectator_view = if room.players.contains_key(&client_id) {
+            None
+        } else {
+            let (p1_wins, p2_wins, draws) = history.iter().fold(
+                (0, 0, 0),
+                |(p1_wins, p2_wins, draws), choices| match choices[0].get_outcome(choices[1]) {
+                    GameOutcome::Win => (p1_wins + 1, p2_wins, draws),
+                    GameOutcome::Loss => (p1_wins, p2_wins + 1, draws),
+                    GameOutcome::Draw => (p1_wins, p2_wins, draws + 1),
+                },
+            );
+            let player_chosen = room.players.values().map(|p| p.choice.is_some()).collect();
+            Some(SpectatorView {
+                player_wins: vec![p1_wins, p2_wins],
+                player_chosen,
+                draws,
+            })
+        };
         RoomView {
             num_players: room.players.len() as u64,
-            choice: room.players.get(&player_id).unwrap().choice,
-            opponent_chosen,
             history,
-            wins,
-            losses,
-            draws,
+            player_view,
+            spectator_view,
         }
     }
 
-    async fn send_state_to_players(&self, room_id: &RoomId) {
+    async fn broadcast_state(&self, room_id: &RoomId) {
         let room = self.rooms.get(room_id).unwrap();
-        for (player_id, player_state) in room.players.iter() {
-            let view = self.get_game_view(&room_id, *player_id);
-            player_state
+        for (client_id, client_info) in room.clients.iter() {
+            let view = self.get_game_view(&room_id, *client_id);
+            client_info
                 .tx
                 .send(ClientNotification {
                     room_state: Some(view),
@@ -170,44 +208,29 @@ impl RpsState {
     }
 }
 
-async fn handle_rps_client(
-    global_state: Arc<Mutex<RpsState>>,
-    room_id: String,
-    mut ws: WebSocket,
-) {
+async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, mut ws: WebSocket) {
     let (tx, mut rx) = mpsc::channel(1);
     let room_id = RoomId(room_id);
-    let player_id;
+    let client_id;
     {
         let mut gs = global_state.lock().await;
-        player_id = gs.get_new_player_id();
+        client_id = gs.get_new_client_id();
         let room = gs.rooms.entry(room_id.clone()).or_default();
-        if room.players.len() == 2 {
-            // Ignore error as player could have disconnected
-            ws.send(Message::text(
-                serde_json::to_string(&ClientNotification {
-                    status: ClientStatus::RoomFull,
-                    room_state: None,
-                })
-                .unwrap(),
-            ))
-            .await
-            .ok();
-            return;
+        room.clients.insert(client_id, ClientInfo { tx });
+        if room.players.len() < 2 {
+            room.players.insert(client_id, PlayerState { choice: None });
+            room.history.clear();
         }
-        room.players
-            .insert(player_id, PlayerState { tx, choice: None });
-        room.history.clear();
-        gs.send_state_to_players(&room_id).await;
+        gs.broadcast_state(&room_id).await;
     }
-    let on_command = |global_state: Arc<Mutex<RpsState>>, room_id, player_id, command| {
+    let on_command = |global_state: Arc<Mutex<RpsState>>, room_id, client_id, command| {
         async move {
             match command {
                 Command::Choice(choice) => {
-                    log::debug!("Player {player_id:?} chose {choice:?}");
+                    log::debug!("Player {client_id:?} chose {choice:?}");
                     let mut gs = global_state.lock().await;
                     let room = gs.rooms.get_mut(&room_id).unwrap();
-                    room.players.get_mut(&player_id).unwrap().choice = Some(choice);
+                    room.players.get_mut(&client_id).unwrap().choice = Some(choice);
                     let choices = room
                         .players
                         .iter()
@@ -226,11 +249,11 @@ async fn handle_rps_client(
                                 .collect(),
                         );
                         // clear choices
-                        for (_player_id, mut player_state) in room.players.iter_mut() {
+                        for (_client_id, mut player_state) in room.players.iter_mut() {
                             player_state.choice = None;
                         }
                     }
-                    gs.send_state_to_players(&room_id).await;
+                    gs.broadcast_state(&room_id).await;
                 }
             }
         }
@@ -262,7 +285,7 @@ async fn handle_rps_client(
                                 on_command(
                                     global_state.clone(),
                                     room_id.clone(),
-                                    player_id,
+                                    client_id,
                                     command
                                 )
                                 .await;
@@ -292,11 +315,11 @@ async fn handle_rps_client(
         // cleanup
         let mut gs = global_state.lock().await;
         let room = gs.rooms.get_mut(&room_id).unwrap();
-        room.players.remove(&player_id);
+        room.players.remove(&client_id);
         if room.players.is_empty() {
             gs.rooms.remove(&room_id);
         } else {
-            gs.send_state_to_players(&room_id).await;
+            gs.broadcast_state(&room_id).await;
         }
     }
 }
