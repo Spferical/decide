@@ -25,16 +25,19 @@ async fn main() {
             return;
         }
     };
-    let global_state = Arc::new(Mutex::new(rps::RpsState::new()));
-    let with_global_state = warp::any().map(move || global_state.clone());
+    let rps_state = Arc::new(Mutex::new(rps::RpsState::new()));
+    let with_rps_state = warp::any().map(move || rps_state.clone());
+    let vote_state = Arc::new(Mutex::new(vote::VoteState::new()));
+    let with_vote_state = warp::any().map(move || vote_state.clone());
     let new_vote_route = warp::path!("start_vote")
         .and(warp::post())
         .and(warp::body::content_length_limit(1024 * 32))
+        .and(with_vote_state)
         .and(warp::body::form())
         .and_then(vote::start_vote);
     let rps_route = warp::path!("rps" / "ws" / String)
         .and(warp::ws())
-        .and(with_global_state)
+        .and(with_rps_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
             WebResult::Ok(ws.on_upgrade(|ws| rps::handle_rps_client(rooms, room_id, ws)))
         });
