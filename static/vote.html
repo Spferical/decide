@@ -11,15 +11,28 @@
         if (room == null) {
           document.getElementById("setup").hidden = false;
         } else {
+          document.getElementById("election").hidden = false;
         }
     }
   </script>
   <body onload="init()">
-    <form hidden id="setup" action="/start_vote" method="post">
-      <label for="choices">Enter the choices up for vote, one per line:</label>
-      <textarea id="choices" name="choices"></textarea>
-      <input type="submit" value="Start Vote">
-    </form>
+    <main class="container">
+      <form hidden id="setup" action="/start_vote" method="post">
+        <label for="choices">Enter the choices up for vote, one per line:</label>
+        <textarea name="choices"></textarea>
+        <input type="submit" value="Start Vote">
+      </form>
+      <div hidden id="election">
+        <div id="choices">
+          <a href="#" role="button" class="choice outline">Foobarbitbutt</a>
+          <a href="#" role="button" class="ordering secondary outline">></a>
+          <a href="#" role="button" class="choice outline">Bar</a>
+          <a href="#" role="button" class="ordering secondary outline">=</a>
+          <a href="#" role="button" class="choice outline">Baz</a>
+        </div>
+        <div id="submitted_outer"><span id="num_submitted">0</span>/<span id="num_players">0</span> voters have submitted ballots.</div>
+      </div>
+    </main>
   </body>
 </html>
 
