@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rock Paper Scissors</title>
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1.5.3/css/pico.min.css">
+  </head>
+  <script>
+    function init() {
+        var url = new URL(document.location);
+        var room = url.searchParams.get('room');
+        if (room == null) {
+            room = crypto.randomUUID().substr(0, 5);
+            url.searchParams.append('room', room);
+            document.location = url.toString();
+        }
+
+        var elements = {};
+        [
+            "status", "num_players_outer", "history_outer", "choice_outer",
+             "num_players", "history", "choice", "stats_outer", "wins",
+             "losses", "draws", "buttons", "opponent_status",
+             "spectator_stats_outer", "spectator_wins", "spectator_draws",
+             "num_spectators"
+        ].forEach(
+            name => {
+                elements[name] = document.getElementById(name);
+            }
+        );
+        elements.status = document.getElementById("status");
+        elements.num_players_outer = document.getElementById("num_players_outer");
+
+        var ws_protocol;
+        if (window.location.protocol != "https:") {
+            ws_protocol = "ws://";
+        } else {
+            ws_protocol = "wss://";
+        }
+        const uri = ws_protocol + location.host + '/rps/ws/' + room;
+        const ws = new WebSocket(uri);
+        var state = {"status": "connecting"};
+        ws.onclose = function() {
+            if (state.status != "room_full") {
+                state.status = "disconnected";
+                elements.status.innerHTML = '<em>Disconnected from server! Try refreshing.</em>';
+                elements.status.style.color = "red";
+                elements.num_players_outer.hidden = true;
+            }
+        };
+        ws.onmessage = function(msg) {
+            const new_state = JSON.parse(msg.data);
+            console.log(new_state);
+
+            const player_view = new_state.room_state.player_view;
+            const is_player = !!new_state.room_state.player_view;
+            const spectator_view = new_state.room_state.spectator_view;
+
+            if (is_player) {
+                elements.status.innerHTML = "You are a player!";
+            } else {
+                elements.status.innerHTML = "You are a spectator!";
+            }
+
+            elements.num_players.innerHTML = new_state.room_state.num_players;
+            elements.num_spectators.innerHTML = new_state.room_state.num_spectators;
+            elements.num_players_outer.hidden = false;
+
+            elements.buttons.hidden = !is_player;
+
+            if (is_player) {
+                if (player_view.opponent_chosen) {
+                    elements.opponent_status.innerHTML = "Opponent has selected a choice.";
+                } else {
+                    elements.opponent_status.innerHTML = "Waiting for opponent...";
+                }
+            }
+            elements.opponent_status.hidden = !is_player;
+
+            let history = new_state.room_state.history;
+            if (history.length == 0) {
+                elements.history_outer.hidden = true;
+            } else {
+                let history_info = "<ol>";
+                for (var i = 0; i < history.length; i++) {
+                    let item = `${history[i][0]} vs ${history[i][1]}`;
+                    if (is_player) {
+                        item = `${player_view.outcome_history[i]}: ${item}`;
+                    }
+                    history_info += `<li>${item}</li>`
+                }
+                history_info += "</ol>";
+                elements.history.innerHTML = history_info;
+                elements.history_outer.hidden = false;
+            }
+            if (is_player && player_view.choice) {
+                elements.choice.innerHTML = player_view.choice;
+                elements.choice_outer.hidden = false;
+            } else {
+                elements.choice_outer.hidden = true;
+            }
+            if (is_player && (player_view.wins || player_view.losses || player_view.draws)) {
+                elements.stats_outer.hidden = false;
+                elements.wins.innerHTML = player_view.wins;
+                elements.losses.innerHTML = player_view.losses;
+                elements.draws.innerHTML = player_view.draws;
+            } else if (!is_player && (spectator_view.wins || spectator_view.losses || spectator_view.draws)) {
+                elements.spectator_stats_outer.hidden = false;
+                elements.spectator_wins.innerHTML = spectator_view.player_wins;
+                elements.spectator_draws.innerHTML = spectator_view.draws;
+            } else {
+                elements.stats_outer.hidden = true;
+            }
+            state = new_state;
+        };
+        ["rock", "paper", "scissors"].forEach(choice => {
+            const button = document.getElementById(choice);
+            button.onclick = function() {
+                ws.send(JSON.stringify({"choice": choice}));
+            };
+        });
+    }
+  </script>
+  <body onload="init()">
+    <div hidden id="buttons">
+      <a href="#" role="button" id="rock">rock</a>
+      <a href="#" role="button" id="paper">paper</a>
+      <a href="#" role="button" id="scissors">scissors</a>
+    </div>
+    <div hidden id="choice_outer">You have selected: <span id="choice">N/A</span>.</div>
+    <div hidden id="opponent_status"></div>
+    <div id="status">Not connected.</div>
+    <div hidden id="stats_outer">Wins: <span id="wins">0</span> Losses: <span id="losses">0</span> Draws: <span id="draws">0</span></div>
+    <div hidden id="spectator_stats_outer">Wins: <span id="spectator_wins">0 0</span> Draws: <span id="spectator_draws">0</span></div>
+
+    <div hidden id="num_players_outer">There are <span id="num_players">0</span> players and <span id="num_spectators">0</span> spectators.</div>
+    <div hidden id="history_outer">Game history:<span id="history"></span></div>
+  </body>
+</html>
