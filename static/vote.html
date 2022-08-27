@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Vote</title>
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1.5.3/css/pico.min.css">
+  </head>
+  <script>
+    function init() {
+        var url = new URL(document.location);
+        var room = url.searchParams.get('room');
+        if (room == null) {
+          document.getElementById("setup").hidden = false;
+        } else {
+        }
+    }
+  </script>
+  <body onload="init()">
+    <form hidden id="setup" action="/start_vote" method="post">
+      <label for="choices">Enter the choices up for vote, one per line:</label>
+      <textarea id="choices" name="choices"></textarea>
+      <input type="submit" value="Start Vote">
+    </form>
+  </body>
+</html>
+

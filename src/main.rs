@@ -4,6 +4,7 @@ use tokio::sync::Mutex;
 use warp::{Filter, Rejection};
 
 mod rps;
+mod vote;
 
 type WebResult<T> = std::result::Result<T, Rejection>;
 
@@ -26,13 +27,17 @@ async fn main() {
     };
     let global_state = Arc::new(Mutex::new(rps::RpsState::new()));
     let with_global_state = warp::any().map(move || global_state.clone());
-    let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}!", name));
-    let ws_route = warp::path!("rps" / "ws" / String)
+    let new_vote_route = warp::path!("start_vote")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(1024 * 32))
+        .and(warp::body::form())
+        .and_then(vote::start_vote);
+    let rps_route = warp::path!("rps" / "ws" / String)
         .and(warp::ws())
         .and(with_global_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
             WebResult::Ok(ws.on_upgrade(|ws| rps::handle_rps_client(rooms, room_id, ws)))
         });
-    let routes = hello.or(warp::fs::dir("static")).or(ws_route);
+    let routes = new_vote_route.or(warp::fs::dir("static")).or(rps_route);
     warp::serve(routes).run(addr).await
 }
