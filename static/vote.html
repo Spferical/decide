@@ -3,16 +3,78 @@
   <head>
     <title>Vote</title>
     <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1.5.3/css/pico.min.css">
+    <style>
+      .choice {
+          user-select: none;
+          cursor: grab;
+      }
+    </style>
   </head>
   <script>
     function init() {
-        var url = new URL(document.location);
-        var room = url.searchParams.get('room');
+        let url = new URL(document.location);
+        let room = url.searchParams.get('room');
         if (room == null) {
           document.getElementById("setup").hidden = false;
-        } else {
-          document.getElementById("election").hidden = false;
+          return;
         }
+
+        let elements = {};
+        [
+            "status", "setup", "election", "choices", "submitted_outer",
+            "submitted", "num_players",
+        ].forEach(
+            name => {
+                elements[name] = document.getElementById(name);
+            }
+        );
+
+        let ws_protocol;
+        if (window.location.protocol != "https:") {
+            ws_protocol = "ws://";
+        } else {
+            ws_protocol = "wss://";
+        }
+        const uri = ws_protocol + location.host + '/vote/ws/' + room;
+        const ws = new WebSocket(uri);
+
+        let state = {"status": "connecting"};
+
+        ws.onclose = function() {
+          state.status = "disconnected";
+          elements.status.innerHTML = '<em>Disconnected from server! Try refreshing.</em>';
+          elements.status.style.color = "red";
+        };
+
+        ws.onmessage = function(msg) {
+          const new_state = JSON.parse(msg.data);
+          console.log(new_state);
+        }
+
+        let selected = null;
+        function on_drag_start(e) {
+          selected = e.target;
+        }
+        function on_drag_over(e) {
+          let a = selected.nextSibling;
+          e.target.parentNode.insertBefore(selected, e.target.nextSibling);
+          e.target.parentNode.insertBefore(e.target, a);
+        }
+        document.getElementById("election").hidden = false;
+        elements.choices.querySelectorAll(".choice").forEach(function (item) {
+          item.draggable = true;
+          item.ondragstart = on_drag_start;
+          item.ondragover = on_drag_over;
+        });
+        elements.choices.querySelectorAll(".ordering").forEach(function(item) {
+          item.onclick = function() {
+            if (item.innerHTML == ">" || item.innerHTML == "&gt;") {
+              item.innerHTML = "=";
+            } else {
+              item.innerHTML = ">";
+            }
+          }
+        });
     }
   </script>
   <body onload="init()">
@@ -23,6 +85,7 @@
         <input type="submit" value="Start Vote">
       </form>
       <div hidden id="election">
+        <div id="status">Not connected.</div>
         <div id="choices">
           <a href="#" role="button" class="choice outline">Foobarbitbutt</a>
           <a href="#" role="button" class="ordering secondary outline">></a>
@@ -32,7 +95,7 @@
         </div>
         <div id="submitted_outer"><span id="num_submitted">0</span>/<span id="num_players">0</span> voters have submitted ballots.</div>
       </div>
-      <article id="electionresults">
+      <article hidden id="electionresults">
         <header>The results are in! The winner is: <strong>Foobarbuttbit</strong></header>
         <table id="defeats_matrix">
           <tr><td>Option</td><td>Foobarbitbutt</td><td>Bar</td><td>Baz</td></tr>
