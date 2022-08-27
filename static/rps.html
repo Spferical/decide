@@ -120,18 +120,21 @@
     }
   </script>
   <body onload="init()">
-    <div hidden id="buttons">
-      <a href="#" role="button" id="rock">rock</a>
-      <a href="#" role="button" id="paper">paper</a>
-      <a href="#" role="button" id="scissors">scissors</a>
-    </div>
-    <div hidden id="choice_outer">You have selected: <span id="choice">N/A</span>.</div>
-    <div hidden id="opponent_status"></div>
-    <div id="status">Not connected.</div>
-    <div hidden id="stats_outer">Wins: <span id="wins">0</span> Losses: <span id="losses">0</span> Draws: <span id="draws">0</span></div>
-    <div hidden id="spectator_stats_outer">Wins: <span id="spectator_wins">0 0</span> Draws: <span id="spectator_draws">0</span></div>
+    <main class="container">
+      <div hidden id="buttons">
+        <a href="#" role="button" id="rock">rock</a>
+        <a href="#" role="button" id="paper">paper</a>
+        <a href="#" role="button" id="scissors">scissors</a>
+      </div>
+      <div hidden id="choice_outer">You have selected: <span id="choice">N/A</span>.</div>
+      <div hidden id="opponent_status"></div>
+      <div id="status">Not connected.</div>
+      <div hidden id="stats_outer">Wins: <span id="wins">0</span> Losses: <span id="losses">0</span> Draws: <span id="draws">0</span></div>
+      <div hidden id="spectator_stats_outer">Wins: <span id="spectator_wins">0 0</span> Draws: <span id="spectator_draws">0</span></div>
 
-    <div hidden id="num_players_outer">There are <span id="num_players">0</span> players and <span id="num_spectators">0</span> spectators.</div>
-    <div hidden id="history_outer">Game history:<span id="history"></span></div>
+      <div hidden id="num_players_outer">There are <span id="num_players">0</span> players and <span id="num_spectators">0</span> spectators.</div>
+      <div hidden id="history_outer">Game history:<span id="history"></span></div>
+    </main>
+
   </body>
 </html>
