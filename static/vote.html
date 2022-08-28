@@ -172,19 +172,24 @@
               }
               elements.votes.replaceChildren(...vote_elements)
 
-              let defeats_matrix_elements = [];
-              let header = document.createElement("tr");
-              let header_children = [document.createElement("td")];
+              let thead = document.createElement("thead");
+              let header_row = document.createElement("tr");
+              let topleft_th = document.createElement("th");
+              topleft_th.setAttribute("scope", "col");
+              let header_row_children = [topleft_th];
               for (const choice of new_state.vote.choices) {
-                let header_item = document.createElement("td");
-                header_item.textContent = choice;
-                header_children.push(header_item);
+                let header_row_item = document.createElement("th");
+                header_row_item.setAttribute("scope", "col");
+                header_row_item.textContent = choice;
+                header_row_children.push(header_row_item);
               }
-              header.replaceChildren(...header_children);
-              defeats_matrix_elements.push(header)
+              header_row.replaceChildren(...header_row_children);
+              thead.replaceChildren(header_row);
               const totals = new_state.vote.results.tally.totals;
+              let tbody_children = [];
               for (let i = 0; i < totals.length; i++) {
-                let choice_elem = document.createElement("td");
+                let choice_elem = document.createElement("th");
+                choice_elem.setAttribute("scope", "row");
                 choice_elem.textContent = new_state.vote.choices[i];
                 let row_elements = [choice_elem];
                 for (let j = 0; j < totals[i].length; j++) {
@@ -202,9 +207,11 @@
                 }
                 let row_elem = document.createElement("tr");
                 row_elem.replaceChildren(...row_elements);
-                defeats_matrix_elements.push(row_elem);
+                tbody_children.push(row_elem);
               }
-              elements.defeats_matrix.replaceChildren(...defeats_matrix_elements);
+              let tbody = document.createElement("tbody");
+              tbody.replaceChildren(...tbody_children);
+              elements.defeats_matrix.replaceChildren(thead, tbody);
             }
           } else if (new_state.status == "invalid_room") {
             elements.status.textContent = "Invalid room. Go back and create a game.";
@@ -256,7 +263,7 @@
         <header>The results are in! The winner is: <strong><span id="winner">N/A</span></strong></header>
         <p> The votes are: </p>
         <ul id="votes"></ul>
-        <table id="defeats_matrix">
+        <table role="grid" id="defeats_matrix">
         </table>
       </article>
       <a hidden id="new" href="/vote.html">Create a new election.</a>
