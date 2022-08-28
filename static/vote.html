@@ -22,12 +22,15 @@
         let elements = {};
         [
             "status", "setup", "election", "choices", "submitted_outer",
-            "submitted", "num_players", "submit", "num_votes", "tally"
+            "submitted", "num_players", "submit", "num_votes", "tally",
+            "results", "winner", "defeats_matrix", "votes", "new"
         ].forEach(
             name => {
                 elements[name] = document.getElementById(name);
             }
         );
+
+        elements.new.hidden = false;
 
         let ws_protocol;
         if (window.location.protocol != "https:") {
@@ -43,7 +46,7 @@
         ws.onclose = function() {
           if (state.status != "invalid_room") {
             state.status = "disconnected";
-            elements.status.innerHTML = '<em>Disconnected from server! Try refreshing.</em>';
+            elements.status.textContent = 'Disconnected from server! Try refreshing.';
             elements.status.style.color = "red";
           }
         };
@@ -53,9 +56,9 @@
           console.log(new_state);
           if (new_state.status == "connected") {
             elements.election.hidden = false;
-            elements.status.innerHTML = "Connected!";
-            elements.num_players.innerHTML = new_state.vote.num_players;
-            elements.num_votes.innerHTML = new_state.vote.num_votes;
+            elements.status.textContent = "Connected!";
+            elements.num_players.textContent = new_state.vote.num_players;
+            elements.num_votes.textContent = new_state.vote.num_votes;
             if (new_state.vote.voted) {
               elements.tally.hidden = false;
             }
@@ -68,14 +71,14 @@
                 choice.setAttribute("role", "button");
                 choice.setAttribute("class", "choice outline");
                 choice.dataset.choice_id = i;
-                choice.innerHTML = new_state.vote.choices[i];
+                choice.textContent = new_state.vote.choices[i];
                 elements.choices.append(choice);
                 if (i + 1 != new_state.vote.choices.length) {
                   let order_element = document.createElement("a");
                   order_element.setAttribute("href", "#");
                   order_element.setAttribute("role", "button");
                   order_element.setAttribute("class", "ordering secondary outline");
-                  order_element.innerHTML = ">";
+                  order_element.textContent = ">";
                   elements.choices.append(order_element);
                 }
               }
@@ -99,16 +102,76 @@
               // Click-to-edit ballot ordering.
               elements.choices.querySelectorAll(".ordering").forEach(function(item) {
                 item.onclick = function() {
-                  if (item.innerHTML == ">" || item.innerHTML == "&gt;") {
-                    item.innerHTML = "=";
+                  if (item.textContent == ">" || item.textContent == "&gt;") {
+                    item.textContent = "=";
                   } else {
-                    item.innerHTML = ">";
+                    item.textContent = ">";
                   }
                 }
               });
             }
+
+            if (new_state.vote.results) {
+              elements.results.hidden = false;
+              elements.winner.textContent = new_state.vote.results.tally.winners.map(w => new_state.vote.choices[w]).join(" AND ");
+              let vote_elements = [];
+              for (let i = 0; i < new_state.vote.results.votes.length; i++) {
+                let vote = new_state.vote.results.votes[i];
+                let s = "";
+                for (let j = 0; j < vote.length; j++) {
+                  let vi = vote[j];
+                  if (j != 0) {
+                    if (vote[j].rank != vote[j - 1].rank) {
+                      s += " > ";
+                    } else {
+                      s += " = ";
+                    }
+                  }
+                  s += new_state.vote.choices[vi.candidate];
+                }
+                let elem = document.createElement("li");
+                elem.textContent = s;
+                vote_elements.push(elem);
+              }
+              console.log(vote_elements);
+              elements.votes.replaceChildren(...vote_elements)
+
+              let defeats_matrix_elements = [];
+              let header = document.createElement("tr");
+              let header_children = [document.createElement("td")];
+              for (const choice of new_state.vote.choices) {
+                let header_item = document.createElement("td");
+                header_item.textContent = choice;
+                header_children.push(header_item);
+              }
+              header.replaceChildren(...header_children);
+              defeats_matrix_elements.push(header)
+              const totals = new_state.vote.results.tally.totals;
+              for (let i = 0; i < totals.length; i++) {
+                let choice_elem = document.createElement("td");
+                choice_elem.textContent = new_state.vote.choices[i];
+                let row_elements = [choice_elem];
+                for (let j = 0; j < totals[i].length; j++) {
+                  let elem = document.createElement("td");
+                  if (totals[i][j] > totals[j][i]) {
+                    let inner_elem = document.createElement("mark");
+                    inner_elem.textContent = totals[i][j];
+                    elem.replaceChildren(inner_elem);
+                  } else if (i == j) {
+                    elem.textContent = "-";
+                  } else {
+                    elem.textContent = totals[i][j];
+                  }
+                  row_elements.push(elem);
+                }
+                let row_elem = document.createElement("tr");
+                row_elem.replaceChildren(...row_elements);
+                defeats_matrix_elements.push(row_elem);
+              }
+              elements.defeats_matrix.replaceChildren(...defeats_matrix_elements);
+            }
           } else if (new_state.status == "invalid_room") {
-            elements.status.innerHTML = "Invalid room. Go back and create a game.";
+            elements.status.textContent = "Invalid room. Go back and create a game.";
             url.searchParams.delete("room")
             document.location = url.toString();
           }
@@ -121,7 +184,7 @@
           let rank = 0;
           for (let i = 0; i < elements.choices.children.length; i += 2) {
             let item = parseInt(elements.choices.children[i].dataset.choice_id);
-            if (i != 0 && elements.choices.children[i - 1].innerHTML != "=") {
+            if (i != 0 && elements.choices.children[i - 1].textContent != "=") {
               rank++;
             }
             items.push({"candidate": item, "rank": rank});
@@ -130,7 +193,7 @@
         }
 
         elements.tally.onclick = function() {
-        ws.send(JSON.stringify({"tally": null}));
+          ws.send(JSON.stringify({"tally": null}));
         }
     }
   </script>
@@ -149,20 +212,14 @@
         <button hidden id="tally">Tally the Votes</button>
         <div id="submitted_outer"><span id="num_votes">0</span>/<span id="num_players">0</span> voters have submitted ballots.</div>
       </div>
-      <article hidden id="electionresults">
-        <header>The results are in! The winner is: <strong>Foobarbuttbit</strong></header>
+      <article hidden id="results">
+        <header>The results are in! The winner is: <strong><span id="winner">N/A</span></strong></header>
         <p> The votes are: </p>
-        <ul id="votes">
-          <li>a > b > c</li>
-          <li>b > c > a</li>
-        </ul>
+        <ul id="votes"></ul>
         <table id="defeats_matrix">
-          <tr><td>Option</td><td>Foobarbitbutt</td><td>Bar</td><td>Baz</td></tr>
-          <tr><td>Foobarbitbutt</td><td>0</td><td>1</td><td>3</td></tr>
-          <tr><td>Bar</td><td><mark>2</mark></td><td>1</td><td>3</td></tr>
-          <tr><td>Baz</td><td><mark>3</mark></td><td>0</td><td>0</td></tr>
         </table>
       </article>
+      <a hidden id="new" href="/vote.html">Create a new election.</a>
     </main>
   </body>
 </html>

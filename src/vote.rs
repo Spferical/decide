@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 use futures_util::{SinkExt, StreamExt};
 use rand::Rng;
@@ -8,6 +8,45 @@ use warp::{
     ws::{Message, WebSocket},
     Reply,
 };
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct CondorcetTally {
+    /// totals[a][b] contains the number of votes where candidate a beat b.
+    totals: Vec<Vec<u64>>,
+    winners: Vec<usize>,
+}
+
+fn condorcet_vote(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetTally {
+    let mut totals = vec![vec![0; num_choices]; num_choices];
+    for mut vote in votes.into_iter() {
+        vote.sort_by_key(|item| item.rank);
+        for (i, item) in vote.iter().enumerate() {
+            for item2 in vote[i + 1..]
+                .iter()
+                .skip_while(|item2| item2.rank == item.rank)
+            {
+                totals[item.candidate][item2.candidate] += 1;
+            }
+        }
+    }
+
+    let wins = (0..num_choices)
+        .into_iter()
+        .map(|c| {
+            (0..num_choices)
+                .into_iter()
+                .filter(|&c2| totals[c][c2] > totals[c2][c])
+                .count()
+        })
+        .collect::<Vec<usize>>();
+    let max_wins = wins.iter().cloned().max().unwrap_or(0);
+    let winners = (0..num_choices)
+        .into_iter()
+        .filter(|c| wins[*c] == max_wins)
+        .collect();
+
+    CondorcetTally { totals, winners }
+}
 
 use crate::WebResult;
 
@@ -30,7 +69,7 @@ impl std::fmt::Display for RoomId {
     }
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct VoteItem {
     candidate: usize,
     // Lower is better.
@@ -42,31 +81,37 @@ struct Room {
     clients: HashMap<ClientId, ClientInfo>,
     choices: Vec<String>,
     votes: HashMap<ClientId, Vec<VoteItem>>,
-    voting_finished: bool,
+    results: Option<CondorcetTally>,
 }
 
 struct ClientInfo {
     tx: mpsc::Sender<ClientNotification>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 enum ClientStatus {
     Connected,
     InvalidRoom,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
+struct VotingResults {
+    tally: CondorcetTally,
+    votes: Vec<Vec<VoteItem>>,
+}
+
+#[derive(Debug, serde::Serialize)]
 struct VoteView {
     choices: Vec<String>,
     voted: bool,
     num_votes: usize,
     num_players: usize,
-    voting_results: Option<String>,
+    results: Option<VotingResults>,
 }
 
 /// Data serialized and sent to the client in response to a command or other change in state.
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct ClientNotification {
     status: ClientStatus,
     vote: Option<VoteView>,
@@ -96,7 +141,10 @@ impl VoteState {
                         choices: room.choices.clone(),
                         voted: room.votes.get(client_id).is_some(),
                         num_votes: room.votes.len(),
-                        voting_results: None,
+                        results: room.results.as_ref().map(|tally| VotingResults {
+                            tally: tally.clone(),
+                            votes: room.votes.values().cloned().collect(),
+                        }),
                         num_players: room.clients.len(),
                     }),
                 })
@@ -139,7 +187,7 @@ pub async fn start_vote(state: Arc<Mutex<VoteState>>, form: NewVoteForm) -> WebR
             choices,
             votes: HashMap::new(),
             clients: HashMap::new(),
-            voting_finished: false,
+            results: None,
         },
     );
     let uri = Uri::builder()
@@ -183,13 +231,19 @@ pub async fn handle_vote_client(
             Command::Vote(votes) => {
                 let mut gs = global_state.lock().await;
                 let room = gs.rooms.get_mut(&room_id).unwrap();
-                room.votes.insert(client_id, votes);
-                gs.broadcast_state(&room_id).await;
+                if room.results.is_none() {
+                    room.votes.insert(client_id, votes);
+                    gs.broadcast_state(&room_id).await;
+                }
             }
             Command::Tally => {
                 let mut gs = global_state.lock().await;
                 let room = gs.rooms.get_mut(&room_id).unwrap();
-                room.voting_finished = true;
+                let num_choices = room.choices.len();
+                let votes = room.votes.values().cloned().collect();
+                room.results = Some(condorcet_vote(num_choices, votes));
+                log::debug!("Vote results: {:?}", room.results);
+                gs.broadcast_state(&room_id).await;
             }
         }
     };
@@ -197,6 +251,7 @@ pub async fn handle_vote_client(
         tokio::select! {
             msg = rx.recv() => match msg {
                 Some(msg) => {
+                    log::debug!("Sending message: {:?}", msg);
                     let msg = serde_json::to_string(&msg).unwrap();
                     if let Err(err) = ws.send(Message::text(msg)).await {
                         log::debug!("Error sending message to client: {}", err);
@@ -251,7 +306,6 @@ pub async fn handle_vote_client(
         let mut gs = global_state.lock().await;
         let room = gs.rooms.get_mut(&room_id).unwrap();
         room.clients.remove(&client_id);
-        room.votes.remove(&client_id);
         if room.clients.is_empty() {
             gs.rooms.remove(&room_id);
         } else {
