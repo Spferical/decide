@@ -104,7 +104,7 @@ struct VotingResults {
 #[derive(Debug, serde::Serialize)]
 struct VoteView {
     choices: Vec<String>,
-    voted: bool,
+    your_vote: Option<UserVote>,
     num_votes: usize,
     num_players: usize,
     results: Option<VotingResults>,
@@ -139,7 +139,7 @@ impl VoteState {
                     status: ClientStatus::Connected,
                     vote: Some(VoteView {
                         choices: room.choices.clone(),
-                        voted: room.votes.get(client_id).is_some(),
+                        your_vote: room.votes.get(client_id).cloned(),
                         num_votes: room.votes.len(),
                         results: room.results.as_ref().map(|tally| VotingResults {
                             tally: tally.clone(),
@@ -246,7 +246,12 @@ pub async fn handle_vote_client(
                 let mut gs = global_state.lock().await;
                 let room = gs.rooms.get_mut(&room_id).unwrap();
                 let num_choices = room.choices.len();
-                let votes = room.votes.values().map(|v| &v.selections).cloned().collect();
+                let votes = room
+                    .votes
+                    .values()
+                    .map(|v| &v.selections)
+                    .cloned()
+                    .collect();
                 room.results = Some(condorcet_vote(num_choices, votes));
                 log::debug!("Vote results: {:?}", room.results);
                 gs.broadcast_state(&room_id).await;

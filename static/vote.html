@@ -11,6 +11,22 @@
     </style>
   </head>
   <script>
+    function describe_vote(choices, vote) {
+      let s = `${vote.name}: `;
+      for (let j = 0; j < vote.selections.length; j++) {
+        let vi = vote.selections[j];
+        if (j != 0) {
+          if (vote.selections[j].rank != vote.selections[j - 1].rank) {
+            s += " > ";
+          } else {
+            s += " = ";
+          }
+        }
+        s += choices[vi.candidate];
+      }
+      return s;
+    }
+
     function init() {
         let url = new URL(document.location);
         let room = url.searchParams.get('room');
@@ -23,7 +39,8 @@
         [
             "status", "setup", "election", "choices", "submitted_outer",
             "submitted", "num_players", "submit", "num_votes", "tally",
-            "results", "winner", "defeats_matrix", "votes", "new", "voter_name"
+            "results", "winner", "defeats_matrix", "votes", "new", "voter_name",
+            "your_vote", "your_vote_outer",
         ].forEach(
             name => {
                 elements[name] = document.getElementById(name);
@@ -56,11 +73,11 @@
           const new_state = JSON.parse(msg.data);
           console.log(new_state);
           if (new_state.status == "connected") {
-            elements.election.hidden = false;
+            elements.election.hidden = !!new_state.vote.results;
             elements.status.textContent = "Connected!";
             elements.num_players.textContent = new_state.vote.num_players;
             elements.num_votes.textContent = new_state.vote.num_votes;
-            if (new_state.vote.voted) {
+            if (new_state.vote.your_vote) {
               elements.tally.hidden = false;
             }
 
@@ -137,26 +154,20 @@
               });
             }
 
+            elements.your_vote_outer.hidden = !new_state.vote.your_vote;
+            if (new_state.vote.your_vote) {
+              elements.your_vote.textContent = describe_vote(new_state.vote.choices, new_state.vote.your_vote);
+            }
+
             if (new_state.vote.results) {
               elements.results.hidden = false;
               elements.winner.textContent = new_state.vote.results.tally.winners.map(w => new_state.vote.choices[w]).join(" AND ");
+
               let vote_elements = [];
               for (let i = 0; i < new_state.vote.results.votes.length; i++) {
                 let vote = new_state.vote.results.votes[i];
-                let s = `${vote.name}: `;
-                for (let j = 0; j < vote.selections.length; j++) {
-                  let vi = vote.selections[j];
-                  if (j != 0) {
-                    if (vote.selections[j].rank != vote.selections[j - 1].rank) {
-                      s += " > ";
-                    } else {
-                      s += " = ";
-                    }
-                  }
-                  s += new_state.vote.choices[vi.candidate];
-                }
                 let elem = document.createElement("li");
-                elem.textContent = s;
+                elem.textContent = describe_vote(new_state.vote.choices, vote);
                 vote_elements.push(elem);
               }
               elements.votes.replaceChildren(...vote_elements)
@@ -231,11 +242,13 @@
         <input type="submit" value="Start Vote">
       </form>
       <div hidden id="election">
+        <p>Edit your ballot by clicking or dragging.</p>
         <div hidden id="choices">
         </div>
         <label for="voter_name">Voter name:</label>
         <input id="voter_name" value="???"></input>
         <button id="submit">Submit Your Vote</button>
+        <div hidden id="your_vote_outer">You submitted: <span id="your_vote">N/A</span></div>
         <button hidden id="tally">Tally the Votes</button>
         <div id="submitted_outer"><span id="num_votes">0</span>/<span id="num_players">0</span> voters have submitted ballots.</div>
       </div>
