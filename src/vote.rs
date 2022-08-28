@@ -80,7 +80,7 @@ pub struct VoteItem {
 struct Room {
     clients: HashMap<ClientId, ClientInfo>,
     choices: Vec<String>,
-    votes: HashMap<ClientId, Vec<VoteItem>>,
+    votes: HashMap<ClientId, UserVote>,
     results: Option<CondorcetTally>,
 }
 
@@ -98,7 +98,7 @@ enum ClientStatus {
 #[derive(Debug, serde::Serialize)]
 struct VotingResults {
     tally: CondorcetTally,
-    votes: Vec<Vec<VoteItem>>,
+    votes: Vec<UserVote>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -165,10 +165,16 @@ pub struct NewVoteForm {
     choices: String,
 }
 
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct UserVote {
+    name: String,
+    selections: Vec<VoteItem>,
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Command {
-    Vote(Vec<VoteItem>),
+    Vote(UserVote),
     Tally,
 }
 
@@ -228,11 +234,11 @@ pub async fn handle_vote_client(
     let on_command = |global_state: Arc<Mutex<VoteState>>, room_id, client_id, command| async move {
         log::debug!("Got command: {:?}", command);
         match command {
-            Command::Vote(votes) => {
+            Command::Vote(user_vote) => {
                 let mut gs = global_state.lock().await;
                 let room = gs.rooms.get_mut(&room_id).unwrap();
                 if room.results.is_none() {
-                    room.votes.insert(client_id, votes);
+                    room.votes.insert(client_id, user_vote);
                     gs.broadcast_state(&room_id).await;
                 }
             }
@@ -240,7 +246,7 @@ pub async fn handle_vote_client(
                 let mut gs = global_state.lock().await;
                 let room = gs.rooms.get_mut(&room_id).unwrap();
                 let num_choices = room.choices.len();
-                let votes = room.votes.values().cloned().collect();
+                let votes = room.votes.values().map(|v| &v.selections).cloned().collect();
                 room.results = Some(condorcet_vote(num_choices, votes));
                 log::debug!("Vote results: {:?}", room.results);
                 gs.broadcast_state(&room_id).await;
