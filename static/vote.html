@@ -86,18 +86,43 @@
 
               // Drag-to-swap ballot items.
               let selected = null;
+              function select(elem) {
+                if (selected) {
+                  selected.classList.remove("contrast");
+                }
+                selected = elem;
+                selected.classList.add("contrast");
+              }
+              function deselect() {
+                if (selected) {
+                  selected.classList.remove("contrast");
+                }
+                selected = null;
+              }
+              function swap(elem1, elem2) {
+                let a = elem1.nextSibling;
+                elem2.parentNode.insertBefore(elem1, elem2.nextSibling);
+                elem2.parentNode.insertBefore(elem2, a);
+              }
               function on_drag_start(e) {
-                selected = e.target;
+                select(e.target);
               }
               function on_drag_over(e) {
-                let a = selected.nextSibling;
-                e.target.parentNode.insertBefore(selected, e.target.nextSibling);
-                e.target.parentNode.insertBefore(e.target, a);
+                swap(selected, e.target);
+              }
+              function on_click(e) {
+                if (selected == null) {
+                  select(e.target);
+                } else {
+                  swap(selected, e.target);
+                  deselect();
+                }
               }
               elements.choices.querySelectorAll(".choice").forEach(function (item) {
                 item.draggable = true;
                 item.ondragstart = on_drag_start;
                 item.ondragover = on_drag_over;
+                item.onclick = on_click;
               });
 
               // Click-to-edit ballot ordering.
