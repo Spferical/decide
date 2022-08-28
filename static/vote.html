@@ -31,6 +31,7 @@
         );
 
         elements.new.hidden = false;
+        elements.status.hidden = false;
 
         let ws_protocol;
         if (window.location.protocol != "https:") {
@@ -199,7 +200,7 @@
   </script>
   <body onload="init()">
     <main class="container">
-      <div id="status">Not connected.</div>
+      <div hidden id="status">Not connected.</div>
       <form hidden id="setup" action="/start_vote" method="post">
         <label for="choices">Enter the choices up for vote, one per line:</label>
         <textarea name="choices"></textarea>
