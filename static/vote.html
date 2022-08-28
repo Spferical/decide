@@ -22,7 +22,7 @@
         let elements = {};
         [
             "status", "setup", "election", "choices", "submitted_outer",
-            "submitted", "num_players",
+            "submitted", "num_players", "submit", "num_votes", "tally"
         ].forEach(
             name => {
                 elements[name] = document.getElementById(name);
@@ -41,62 +41,121 @@
         let state = {"status": "connecting"};
 
         ws.onclose = function() {
-          state.status = "disconnected";
-          elements.status.innerHTML = '<em>Disconnected from server! Try refreshing.</em>';
-          elements.status.style.color = "red";
+          if (state.status != "invalid_room") {
+            state.status = "disconnected";
+            elements.status.innerHTML = '<em>Disconnected from server! Try refreshing.</em>';
+            elements.status.style.color = "red";
+          }
         };
 
         ws.onmessage = function(msg) {
           const new_state = JSON.parse(msg.data);
           console.log(new_state);
+          if (new_state.status == "connected") {
+            elements.election.hidden = false;
+            elements.status.innerHTML = "Connected!";
+            elements.num_players.innerHTML = new_state.vote.num_players;
+            elements.num_votes.innerHTML = new_state.vote.num_votes;
+            if (new_state.vote.voted) {
+              elements.tally.hidden = false;
+            }
+
+            if (elements.choices.hidden) {
+              elements.choices.hidden = false;
+              for (let i = 0; i < new_state.vote.choices.length; i++) {
+                let choice = document.createElement("a");
+                choice.setAttribute("href", "#");
+                choice.setAttribute("role", "button");
+                choice.setAttribute("class", "choice outline");
+                choice.dataset.choice_id = i;
+                choice.innerHTML = new_state.vote.choices[i];
+                elements.choices.append(choice);
+                if (i + 1 != new_state.vote.choices.length) {
+                  let order_element = document.createElement("a");
+                  order_element.setAttribute("href", "#");
+                  order_element.setAttribute("role", "button");
+                  order_element.setAttribute("class", "ordering secondary outline");
+                  order_element.innerHTML = ">";
+                  elements.choices.append(order_element);
+                }
+              }
+
+              // Drag-to-swap ballot items.
+              let selected = null;
+              function on_drag_start(e) {
+                selected = e.target;
+              }
+              function on_drag_over(e) {
+                let a = selected.nextSibling;
+                e.target.parentNode.insertBefore(selected, e.target.nextSibling);
+                e.target.parentNode.insertBefore(e.target, a);
+              }
+              elements.choices.querySelectorAll(".choice").forEach(function (item) {
+                item.draggable = true;
+                item.ondragstart = on_drag_start;
+                item.ondragover = on_drag_over;
+              });
+
+              // Click-to-edit ballot ordering.
+              elements.choices.querySelectorAll(".ordering").forEach(function(item) {
+                item.onclick = function() {
+                  if (item.innerHTML == ">" || item.innerHTML == "&gt;") {
+                    item.innerHTML = "=";
+                  } else {
+                    item.innerHTML = ">";
+                  }
+                }
+              });
+            }
+          } else if (new_state.status == "invalid_room") {
+            elements.status.innerHTML = "Invalid room. Go back and create a game.";
+            url.searchParams.delete("room")
+            document.location = url.toString();
+          }
+          state = new_state;
         }
 
-        let selected = null;
-        function on_drag_start(e) {
-          selected = e.target;
-        }
-        function on_drag_over(e) {
-          let a = selected.nextSibling;
-          e.target.parentNode.insertBefore(selected, e.target.nextSibling);
-          e.target.parentNode.insertBefore(e.target, a);
-        }
-        document.getElementById("election").hidden = false;
-        elements.choices.querySelectorAll(".choice").forEach(function (item) {
-          item.draggable = true;
-          item.ondragstart = on_drag_start;
-          item.ondragover = on_drag_over;
-        });
-        elements.choices.querySelectorAll(".ordering").forEach(function(item) {
-          item.onclick = function() {
-            if (item.innerHTML == ">" || item.innerHTML == "&gt;") {
-              item.innerHTML = "=";
-            } else {
-              item.innerHTML = ">";
+        // Click to submit
+        elements.submit.onclick = function() {
+          let items = [];
+          let rank = 0;
+          for (let i = 0; i < elements.choices.children.length; i += 2) {
+            let item = parseInt(elements.choices.children[i].dataset.choice_id);
+            if (i != 0 && elements.choices.children[i - 1].innerHTML != "=") {
+              rank++;
             }
+            items.push({"candidate": item, "rank": rank});
           }
-        });
+          ws.send(JSON.stringify({"vote": items}))
+        }
+
+        elements.tally.onclick = function() {
+        ws.send(JSON.stringify({"tally": null}));
+        }
     }
   </script>
   <body onload="init()">
     <main class="container">
+      <div id="status">Not connected.</div>
       <form hidden id="setup" action="/start_vote" method="post">
         <label for="choices">Enter the choices up for vote, one per line:</label>
         <textarea name="choices"></textarea>
         <input type="submit" value="Start Vote">
       </form>
       <div hidden id="election">
-        <div id="status">Not connected.</div>
-        <div id="choices">
-          <a href="#" role="button" class="choice outline">Foobarbitbutt</a>
-          <a href="#" role="button" class="ordering secondary outline">></a>
-          <a href="#" role="button" class="choice outline">Bar</a>
-          <a href="#" role="button" class="ordering secondary outline">=</a>
-          <a href="#" role="button" class="choice outline">Baz</a>
+        <div hidden id="choices">
         </div>
-        <div id="submitted_outer"><span id="num_submitted">0</span>/<span id="num_players">0</span> voters have submitted ballots.</div>
+        <button id="submit">Submit Your Vote</button>
+        <button hidden id="tally">Tally the Votes</button>
+        <div id="submitted_outer"><span id="num_votes">0</span>/<span id="num_players">0</span> voters have submitted ballots.</div>
       </div>
       <article hidden id="electionresults">
         <header>The results are in! The winner is: <strong>Foobarbuttbit</strong></header>
+        <p> The votes are: </p>
+        <ul id="votes">
+          <li>a > b > c</li>
+          <li>b > c > a</li>
+        </ul>
         <table id="defeats_matrix">
           <tr><td>Option</td><td>Foobarbitbutt</td><td>Bar</td><td>Baz</td></tr>
           <tr><td>Foobarbitbutt</td><td>0</td><td>1</td><td>3</td></tr>

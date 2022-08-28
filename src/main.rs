@@ -32,7 +32,7 @@ async fn main() {
     let new_vote_route = warp::path!("start_vote")
         .and(warp::post())
         .and(warp::body::content_length_limit(1024 * 32))
-        .and(with_vote_state)
+        .and(with_vote_state.clone())
         .and(warp::body::form())
         .and_then(vote::start_vote);
     let rps_route = warp::path!("rps" / "ws" / String)
@@ -41,6 +41,15 @@ async fn main() {
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
             WebResult::Ok(ws.on_upgrade(|ws| rps::handle_rps_client(rooms, room_id, ws)))
         });
-    let routes = new_vote_route.or(warp::fs::dir("static")).or(rps_route);
+    let vote_route = warp::path!("vote" / "ws" / String)
+        .and(warp::ws())
+        .and(with_vote_state)
+        .and_then(|room_id, ws: warp::ws::Ws, state| async move {
+            WebResult::Ok(ws.on_upgrade(|ws| vote::handle_vote_client(state, room_id, ws)))
+        });
+    let routes = new_vote_route
+        .or(vote_route)
+        .or(warp::fs::dir("static"))
+        .or(rps_route);
     warp::serve(routes).run(addr).await
 }
