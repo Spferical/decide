@@ -25,6 +25,7 @@
   "dependencies": {
     "preact": "^10.1.0",
     "preact-render-to-string": "^5.1.2",
-    "@picocss/pico": "^1.5.3"
+    "@picocss/pico": "^1.5.3",
+    "preact-router": "^4.0.0"
   }
 }
