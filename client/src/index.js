@@ -1,9 +1,15 @@
-import './style';
+import '@picocss/pico/css/pico.min.css';
+import { render, Component } from 'preact';
 
-export default function App() {
-    return (
-        <div>
-            <h1>Hello, World!</h1>
-        </div>
-    );
+export default class App extends Component {
+    render() {
+        return (
+            <main class="container">
+                <section>
+                    <h2><a href="rps">Rock Paper Scissors</a></h2>
+                    <h2><a href="vote">Condorcet Voting</a></h2>
+                </section>
+            </main>
+        );
+    }
 }
