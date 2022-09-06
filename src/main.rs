@@ -29,19 +29,19 @@ async fn main() {
     let with_rps_state = warp::any().map(move || rps_state.clone());
     let vote_state = Arc::new(Mutex::new(vote::VoteState::new()));
     let with_vote_state = warp::any().map(move || vote_state.clone());
-    let new_vote_route = warp::path!("start_vote")
+    let new_vote_route = warp::path!("api" / "start_vote")
         .and(warp::post())
         .and(warp::body::content_length_limit(1024 * 32))
         .and(with_vote_state.clone())
         .and(warp::body::form())
         .and_then(vote::start_vote);
-    let rps_route = warp::path!("rps" / "ws" / String)
+    let rps_route = warp::path!("api" / "rps" / String)
         .and(warp::ws())
         .and(with_rps_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
             WebResult::Ok(ws.on_upgrade(|ws| rps::handle_rps_client(rooms, room_id, ws)))
         });
-    let vote_route = warp::path!("vote" / "ws" / String)
+    let vote_route = warp::path!("api" / "vote" / String)
         .and(warp::ws())
         .and(with_vote_state)
         .and_then(|room_id, ws: warp::ws::Ws, state| async move {
@@ -49,7 +49,8 @@ async fn main() {
         });
     let routes = new_vote_route
         .or(vote_route)
+        .or(rps_route)
         .or(warp::fs::dir("static"))
-        .or(rps_route);
+        .or(warp::fs::file("static/index.html"));
     warp::serve(routes).run(addr).await
 }
