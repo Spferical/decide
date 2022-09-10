@@ -131,7 +131,7 @@ impl RpsState {
             .map(|choices| {
                 let mut choices = choices.into_iter().collect::<Vec<_>>();
                 // If client is a player, sort his choices first.
-                choices.sort_by_key(|(id, _)| if *id == client_id { 1 } else { 2 });
+                choices.sort_by_key(|(id, _)| if *id == client_id { 0 } else { id.0 + 1 });
                 choices.into_iter().map(|(_id, choice)| choice).collect()
             })
             .collect();
