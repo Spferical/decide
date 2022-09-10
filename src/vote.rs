@@ -197,7 +197,7 @@ pub async fn start_vote(state: Arc<Mutex<VoteState>>, form: NewVoteForm) -> WebR
         },
     );
     let uri = Uri::builder()
-        .path_and_query(format!("vote.html?room={room_id}"))
+        .path_and_query(format!("/vote/{room_id}"))
         .build()
         .unwrap();
     Ok(warp::redirect::see_other(uri))
