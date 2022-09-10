@@ -240,10 +240,7 @@ pub async fn handle_rps_client(
                         .map(|(id, state)| (id, state.choice))
                         .collect::<Vec<_>>();
                     log::debug!("Choices: {choices:?}");
-                    if choices.len() < 2 {
-                        return;
-                    }
-                    if choices.iter().all(|(_id, choice)| choice.is_some()) {
+                    if choices.len() == 2 && choices.iter().all(|(_id, choice)| choice.is_some()) {
                         log::debug!("Everyone chose");
                         room.history.push(
                             choices
