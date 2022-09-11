@@ -123,7 +123,7 @@ impl RpsState {
     }
 
     fn get_game_view(&self, room_id: &RoomId, client_id: ClientId) -> RoomView {
-        let room = self.rooms.get(&room_id).unwrap();
+        let room = self.rooms.get(room_id).unwrap();
         let history: Vec<Vec<Choice>> = room
             .history
             .iter()
@@ -143,8 +143,7 @@ impl RpsState {
             let opponent_chosen = room
                 .players
                 .iter()
-                .find(|(id, p)| **id != client_id && p.choice.is_some())
-                .is_some();
+                .any(|(id, p)| *id != client_id && p.choice.is_some());
             let (wins, losses, draws) = history.iter().fold((0, 0, 0), |(w, l, d), choices| {
                 match choices[0].get_outcome(choices[1]) {
                     GameOutcome::Win => (w + 1, l, d),
@@ -193,7 +192,7 @@ impl RpsState {
     async fn broadcast_state(&self, room_id: &RoomId) {
         let room = self.rooms.get(room_id).unwrap();
         for (client_id, client_info) in room.clients.iter() {
-            let view = self.get_game_view(&room_id, *client_id);
+            let view = self.get_game_view(room_id, *client_id);
             client_info
                 .tx
                 .send(ClientNotification {
@@ -274,10 +273,8 @@ pub async fn handle_rps_client(
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
                     log::debug!("Got message: {:?}", msg);
-                    if msg.is_ping() {
-                        if let Err(_) = ws.send(Message::pong("")).await {
-                            break;
-                        }
+                    if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
+                        break;
                     }
                     match msg.to_str() {
                         Ok(msg) => match serde_json::from_str(msg) {

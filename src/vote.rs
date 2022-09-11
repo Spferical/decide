@@ -275,10 +275,8 @@ pub async fn handle_vote_client(
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
                     log::debug!("Got message: {:?}", msg);
-                    if msg.is_ping() {
-                        if let Err(_) = ws.send(Message::pong("")).await {
-                            break;
-                        }
+                    if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
+                        break;
                     }
                     match msg.to_str() {
                         Ok(msg) => match serde_json::from_str::<Command>(msg) {
