@@ -217,6 +217,7 @@ pub async fn handle_vote_client(
         let room = if let Some(room) = gs.rooms.get_mut(&room_id) {
             room
         } else {
+            log::debug!("client {client_id:?} gave invalid room {room_id}");
             ws.send(Message::text(
                 serde_json::to_string(&ClientNotification {
                     status: ClientStatus::InvalidRoom,
@@ -231,6 +232,7 @@ pub async fn handle_vote_client(
         room.clients.insert(client_id, ClientInfo { tx });
         gs.broadcast_state(&room_id).await;
     }
+    log::debug!("client {client_id:?} connected to room {room_id}");
     let on_command = |global_state: Arc<Mutex<VoteState>>, room_id, client_id, command| async move {
         log::debug!("Got command: {:?}", command);
         match command {
@@ -304,7 +306,7 @@ pub async fn handle_vote_client(
                     break
                 },
                 None => {
-                    log::debug!("Client disconnected.");
+                    log::debug!("Client {client_id:?} disconnected.");
                     break
                 },
             }
@@ -320,5 +322,6 @@ pub async fn handle_vote_client(
         } else {
             gs.broadcast_state(&room_id).await;
         }
+        log::debug!("client {client_id:?} disconnected.");
     }
 }
