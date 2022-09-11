@@ -4,7 +4,6 @@
     color: var(--accent);
     background-color: var(--bg);
     border: 1px solid var(--accent);
-    draggable: true;
     user-select: none;
     cursor: grab;
 }
