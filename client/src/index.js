@@ -127,12 +127,21 @@ function describe_vote(choices, vote) {
     return s;
 }
 
+function shuffle_array(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
 class Choices extends Component {
     constructor(props) {
         super();
+        let order = Array(props.choices.length).fill().map((_, i) => i);
+        shuffle_array(order);
         this.state = {
             // Mapping of sorted position -> choice index.
-            order: Array(props.choices.length).fill().map((_, i) => i),
+            order,
             // true if sorted choice i is > choice i+1, else false if equal.
             gt: Array(props.choices.length).fill(true),
             selected: null,
