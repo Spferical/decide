@@ -1,4 +1,17 @@
+main {
+    margin: auto;
+    width: 100%;
+    display: block;
+    max-width: 66rem;
+    padding: 0 1rem;
+}
 .choice {
   user-select: none;
   cursor: grab;
+}
+
+.chosen {
+}
+
+.ordering {
 }

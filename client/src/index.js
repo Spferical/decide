@@ -1,4 +1,4 @@
-import '@picocss/pico/css/pico.min.css';
+import '@vladocar/basic.css/css/basic.min.css';
 import './style.css';
 import { Component, createRef, Fragment } from 'preact';
 import { route, Router } from 'preact-router';
@@ -18,10 +18,8 @@ class Index extends Component {
         }
         return (
             <main class="container">
-                <section>
-                    <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
-                    <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
-                </section>
+                <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
+                <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
             </main>
         )
     }
@@ -86,20 +84,18 @@ class Rps extends Component {
 
         return (
             <Fragment>
-                {is_player && <section>
+                {is_player && <div>
                     {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect.</p>}
-                    <div>
-                        <a href="javascript:void(0)" role="button" onclick={get_onclick("rock")}>rock</a>
-                        {" "}
-                        <a href="javascript:void(0)" role="button" onclick={get_onclick("paper")}>paper</a>
-                        {" "}
-                        <a href="javascript:void(0)" role="button" onclick={get_onclick("scissors")}>scissors</a>
-                    </div>
-                    {player_view.choice && <div>You have selected: {player_view.choice}.</div>}
-                    <div>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</div>
+                    <p>
+                        <button onclick={get_onclick("rock")}>rock</button>
+                        <button onclick={get_onclick("paper")}>paper</button>
+                        <button onclick={get_onclick("scissors")}>scissors</button>
+                    </p>
+                    {player_view.choice && <p>You have selected: {player_view.choice}.</p>}
+                    <p>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</p>
                     {!!(player_view.wins || player_view.losses || player_view.draws) &&
                         <div>Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>}
-                </section>}
+                </div>}
                 {!!spectator_view && !!(spectator_view.player_wins || spectator_view.draws) &&
                     <div> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>
                 }
@@ -177,15 +173,15 @@ class Choices extends Component {
         for (let i = 0; i < props.choices.length; i++) {
             let choice = props.choices[state.order[i]];
             const choice_onclick = () => this.onChoiceClick(i);
-            const choice_class = this.state.selected == i ? "choice outline contrast" : "choice outline";
+            const choice_class = this.state.selected == i ? "choice chosen" : "choice";
             const ondragstart = () => this.onDragStart(i);
             const ondragenter = () => this.onDragEnter(i);
-            choice = <a href="javascript:void(0)" role="button" class={choice_class} onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</a>;
+            choice = <button class={choice_class} draggable="true" onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</button>;
             choices.push(choice);
             if (i + 1 != props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
                 const symbol = this.state.gt[i] ? "<" : "=";
-                let order_elem = <a href="javascript:void(0)" role="button" class="ordering secondary outline" onclick={rank_onclick}>{symbol}</a>;
+                let order_elem = <button class="ordering" onclick={rank_onclick}>{symbol}</button>;
                 choices.push(" ");
                 choices.push(order_elem);
                 choices.push(" ");
@@ -241,8 +237,8 @@ class Vote extends Component {
         console.log(state);
         if (!state.room) {
             return <form action="/api/start_vote" method="post">
-                <label for="choices">Enter the choices up for vote, one per line:</label>
-                <textarea name="choices" />
+                <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
+                <p><textarea name="choices" /></p>
                 <input type="submit" value="Start Vote" />
             </form>
         } else if (state.status == "connecting") {
@@ -256,10 +252,10 @@ class Vote extends Component {
 
         const on_input = event => this.setState({ voter_name: event.target.value });
 
-        let submitted_section = <div />;
+        let submitted_section = null;
         if (state.vote.your_vote) {
             let description = describe_vote(state.vote.choices, state.vote.your_vote);
-            submitted_section = <div>You submitted: {description}</div>;
+            submitted_section = <p>You submitted: {description}</p>;
         }
 
         const submit = () => {
@@ -284,20 +280,20 @@ class Vote extends Component {
         }
 
         return (
-            <section>
-                <p>Edit your ballot by clicking or dragging.</p>
+            <Fragment>
+                <p>Click or drag to edit your ballot.</p>
                 <Choices ref={this.choices_component} choices={state.vote.choices} />
-                <div>
+                <p>
                     <label for="voter_name">Voter name:</label>
                     <input value={state.voter_name} onInput={on_input} />
-                </div>
-                <button onclick={submit}>Submit Your Vote</button>
+                </p>
+                <p><button onclick={submit}>Submit Your Vote</button></p>
                 {submitted_section}
-                <button onclick={tally}>Tally the Votes</button>
-                <div>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</div>
+                <p><button onclick={tally}>Tally the Votes</button></p>
+                <p>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
                 {results}
                 <a href="/vote">Create a new election.</a>
-            </section>
+            </Fragment>
         );
     }
 }
