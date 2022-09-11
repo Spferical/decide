@@ -1,6 +1,6 @@
 import '@picocss/pico/css/pico.min.css';
 import './style.css';
-import { Component, createRef } from 'preact';
+import { Component, createRef, Fragment } from 'preact';
 import { route, Router } from 'preact-router';
 
 class Index extends Component {
@@ -56,48 +56,18 @@ class Rps extends Component {
         if (state.status == "connecting") {
             return <footer>Connecting...</footer>
         } else if (state.status == "disconnected") {
-            return <footer>Disconnected!</footer>
+            return <footer>Disconnected! Try refreshing.</footer>
         }
-        let components = [];
         let player_view = state.room_state.player_view;
         let spectator_view = state.room_state.spectator_view;
         const is_player = !!player_view;
-        if (is_player) {
-            let ws = this.ws;
-            const get_onclick = choice => function() {
-                ws.send(JSON.stringify({ choice }))
-            };
-            components.push(
-                <div>
-                    <a href="javascript:void(0)" role="button" onclick={get_onclick("rock")}>rock</a>
-                    {" "}
-                    <a href="javascript:void(0)" role="button" onclick={get_onclick("paper")}>paper</a>
-                    {" "}
-                    <a href="javascript:void(0)" role="button" onclick={get_onclick("scissors")}>scissors</a>
-                </div>
-            );
-            if (player_view.choice) {
-                components.push(
-                    <div>You have selected: {player_view.choice}.</div>
-                );
-            }
-            components.push(<div>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent..."}</div>);
-        }
-
-        if (is_player && (player_view.wins || player_view.losses || player_view.draws)) {
-            components.push(
-                <div>Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>
-            );
-        } else if (!!spectator_view && (spectator_view.player_wins || spectator_view.draws)) {
-            components.push(<div> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>)
-        }
-
-        components.push(
-            <div>There are {state.room_state.num_players} players and {state.room_state.num_spectators} spectators.</div>
-        );
+        const get_onclick = choice => () => {
+            this.ws.send(JSON.stringify({ choice }))
+        };
 
         let history = state.room_state.history;
-        if (history.length >= 0) {
+        let history_component;
+        if (history.length > 0) {
             let items = [];
             for (let i = 0; i < history.length; i++) {
                 let item = `${history[i][0]} vs ${history[i][1]}`;
@@ -106,13 +76,40 @@ class Rps extends Component {
                 }
                 items.push(<li>{item}</li>)
             }
-            components.push(<ol>{items}</ol>);
+            history_component = (
+                <div>
+                    History:
+                    <ol>{items}</ol>
+                </div>
+            );
         }
 
-        components.push(
-            <footer>{is_player ? "You are a player!" : "You are a spectator!"}</footer>
+        return (
+            <Fragment>
+                {is_player && <section>
+                    {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect.</p>}
+                    <div>
+                        <a href="javascript:void(0)" role="button" onclick={get_onclick("rock")}>rock</a>
+                        {" "}
+                        <a href="javascript:void(0)" role="button" onclick={get_onclick("paper")}>paper</a>
+                        {" "}
+                        <a href="javascript:void(0)" role="button" onclick={get_onclick("scissors")}>scissors</a>
+                    </div>
+                    {player_view.choice && <div>You have selected: {player_view.choice}.</div>}
+                    <div>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</div>
+                    {!!(player_view.wins || player_view.losses || player_view.draws) &&
+                        <div>Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>}
+                </section>}
+                {!!spectator_view && !!(spectator_view.player_wins || spectator_view.draws) &&
+                    <div> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>
+                }
+                {history_component}
+                <footer>
+                    <div>There are {state.room_state.num_players} players and {state.room_state.num_spectators} spectators.</div>
+                    <div>{is_player ? "You are a player!" : "You are a spectator!"}</div>
+                </footer>
+            </Fragment>
         );
-        return components;
     }
 }
 
