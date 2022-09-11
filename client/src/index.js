@@ -3,22 +3,28 @@ import './style.css';
 import { Component, createRef } from 'preact';
 import { route, Router } from 'preact-router';
 
-function Index() {
-    function rps() {
-        const room = crypto.randomUUID().substring(0, 5);
-        route(`/rps/${room}`);
+class Index extends Component {
+    componentDidMount() {
+        document.title = "Decide"
     }
-    function vote() {
-        route("/vote/");
+
+    render() {
+        function rps() {
+            const room = crypto.randomUUID().substring(0, 5);
+            route(`/rps/${room}`);
+        }
+        function vote() {
+            route("/vote/");
+        }
+        return (
+            <main class="container">
+                <section>
+                    <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
+                    <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
+                </section>
+            </main>
+        )
     }
-    return (
-        <main class="container">
-            <section>
-                <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
-                <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
-            </section>
-        </main>
-    )
 }
 
 function make_websocket(path) {
@@ -38,6 +44,7 @@ class Rps extends Component {
     }
 
     componentDidMount() {
+        document.title = "Rock Paper Scissors"
         let ws = make_websocket(`/api/rps/${this.room}`);
         ws.onclose = () => this.setState({ status: "disconnected" });
         ws.onmessage = msg => this.setState(JSON.parse(msg.data));
@@ -230,6 +237,7 @@ class Vote extends Component {
     }
 
     componentDidMount() {
+        document.title = "Vote";
         if (this.room) {
             let ws = make_websocket(`/api/vote/${this.room}`);
             ws.onclose = () => this.setState({ status: "disconnected" });
