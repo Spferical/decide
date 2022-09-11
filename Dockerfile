@@ -23,7 +23,8 @@ copy ./client ./
 run npm run build
 
 FROM debian:buster-slim
-run pwd
+env DEBIAN_FRONTEND=noninteractive
+run apt update && apt install -y dumb-init && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/cargo/bin/decide /usr/local/bin/decide
 COPY --from=clientbuilder app/build static
 
@@ -32,4 +33,5 @@ user decide
 
 expose 8000
 
+entrypoint ["/usr/bin/dumb-init", "--"]
 cmd ["/usr/local/bin/decide", "0.0.0.0:8000"]
