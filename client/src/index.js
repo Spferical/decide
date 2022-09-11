@@ -206,7 +206,7 @@ function VoteResults({ choices, results }) {
     const totals = results.tally.totals;
     const trows = totals.map((_, i) => {
         const tds = totals[i].map((val, j) => {
-            const symbol = (i == j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : { val };
+            const symbol = (i == j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : val.toString();
             return <td key={j}>{symbol}</td>
         });
         return <tr key={i}><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
