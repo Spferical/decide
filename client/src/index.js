@@ -1,4 +1,3 @@
-import '@vladocar/basic.css/css/basic.min.css';
 import './style.css';
 import { Component, createRef, Fragment } from 'preact';
 import { route, Router } from 'preact-router';

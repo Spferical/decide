@@ -1,17 +1,21 @@
-main {
-    margin: auto;
-    width: 100%;
-    display: block;
-    max-width: 66rem;
-    padding: 0 1rem;
-}
+@import url('~simpledotcss/simple.min.css');
+
 .choice {
-  user-select: none;
-  cursor: grab;
+    color: var(--accent);
+    background-color: var(--bg);
+    border: 1px solid var(--accent);
+    draggable: true;
+    user-select: none;
+    cursor: grab;
 }
 
 .chosen {
+    color: var(--bg);
+    background-color: var(--accent);
 }
 
 .ordering {
+    color: var(--accent);
+    background-color: var(--bg);
+    border: 1px solid var(--accent);
 }
