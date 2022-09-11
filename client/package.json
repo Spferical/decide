@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "build": "preact build",
+    "analyze": "preact build --analyze",
     "serve": "sirv build --port 8080 --cors --single",
     "dev": "preact watch",
     "lint": "eslint src"
