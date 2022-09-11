@@ -7,10 +7,10 @@ function Index() {
     function rps() {
         const room = crypto.randomUUID().substring(0, 5);
         route(`/rps/${room}`);
-    };
+    }
     function vote() {
         route("/vote/");
-    };
+    }
     return (
         <main class="container">
             <section>
@@ -39,12 +39,8 @@ class Rps extends Component {
 
     componentDidMount() {
         let ws = make_websocket(`/api/rps/${this.room}`);
-        ws.onclose = function() {
-            this.setState({ status: "disconnected" });
-        }.bind(this);
-        ws.onmessage = function(msg) {
-            this.setState(JSON.parse(msg.data));
-        }.bind(this);
+        ws.onclose = () => this.setState({ status: "disconnected" });
+        ws.onmessage = msg => this.setState(JSON.parse(msg.data));
         this.ws = ws;
     }
 
@@ -62,7 +58,7 @@ class Rps extends Component {
         if (is_player) {
             let ws = this.ws;
             const get_onclick = choice => function() {
-                ws.send(JSON.stringify({ "choice": choice }))
+                ws.send(JSON.stringify({ choice }))
             };
             components.push(
                 <div>
@@ -96,7 +92,7 @@ class Rps extends Component {
         let history = state.room_state.history;
         if (history.length >= 0) {
             let items = [];
-            for (var i = 0; i < history.length; i++) {
+            for (let i = 0; i < history.length; i++) {
                 let item = `${history[i][0]} vs ${history[i][1]}`;
                 if (is_player) {
                     item = `${player_view.outcome_history[i]}: ${item}`;
@@ -146,7 +142,7 @@ class Choices extends Component {
         let tmp = order[j];
         order[j] = order[i];
         order[i] = tmp;
-        return { order: order }
+        return { order }
     }
 
     onChoiceClick(i) {
@@ -160,7 +156,7 @@ class Choices extends Component {
     onRankClick(i) {
         let gt = this.state.gt.slice();
         gt[i] = !gt[i];
-        this.setState({ gt: gt });
+        this.setState({ gt });
     }
 
     onDragStart(i) {
@@ -176,14 +172,14 @@ class Choices extends Component {
         let choices = [];
         for (let i = 0; i < props.choices.length; i++) {
             let choice = props.choices[state.order[i]];
-            const choice_onclick = function() { this.onChoiceClick(i) }.bind(this);
+            const choice_onclick = () => this.onChoiceClick(i);
             const choice_class = this.state.selected == i ? "choice outline contrast" : "choice outline";
-            const ondragstart = function() { this.onDragStart(i) }.bind(this);
-            const ondragenter = function() { this.onDragEnter(i) }.bind(this);
+            const ondragstart = () => this.onDragStart(i);
+            const ondragenter = () => this.onDragEnter(i);
             choice = <a href="#" role="button" class={choice_class} onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</a>;
             choices.push(choice);
             if (i + 1 != props.choices.length) {
-                const rank_onclick = function() { this.onRankClick(i) }.bind(this);
+                const rank_onclick = () => this.onRankClick(i);
                 const symbol = this.state.gt[i] ? "<" : "=";
                 let order_elem = <a href="#" role="button" class="ordering secondary outline" onclick={rank_onclick}>{symbol}</a>;
                 choices.push(" ");
@@ -197,17 +193,16 @@ class Choices extends Component {
 
 function VoteResults({ choices, results }) {
     const winners = results.tally.winners.map(i => choices[i]).join(" AND ");
-    const votes = results.votes.map(v => <li>{describe_vote(choices, v)}</li>);
-    const tchoices = choices.map(c => <th scope="row">{c}</th>);
-    const thead = <thead><tr><th scope="col" />{tchoices}</tr></thead>;
+    const votes = results.votes.map((v, i) => <li key={i}>{describe_vote(choices, v)}</li>);
+    const tchoices = choices.map((c, i) => <th key={i} scope="row">{c}</th>);
+    const thead = <thead><tr><th key="head" scope="col" />{tchoices}</tr></thead>;
     const totals = results.tally.totals;
     const trows = totals.map((_, i) => {
         const tds = totals[i].map((val, j) => {
-            if (i == j) return <td>-</td>;
-            if (val > totals[j][i]) return <td><mark>{val}</mark></td>;
-            return <td>{val}</td>
+            const symbol = (i == j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : { val };
+            return <td key={j}>{symbol}</td>
         });
-        return <tr><th scope="row">{choices[i]}</th>{tds}</tr>
+        return <tr key={i}><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
     });
     return <article>
         <header>The results are in! The winner is: <strong>{winners}</strong></header>
@@ -235,14 +230,10 @@ class Vote extends Component {
     }
 
     componentDidMount() {
-        if (!!this.room) {
+        if (this.room) {
             let ws = make_websocket(`/api/vote/${this.room}`);
-            ws.onclose = function() {
-                this.setState({ status: "disconnected" });
-            }.bind(this);
-            ws.onmessage = function(msg) {
-                this.setState(JSON.parse(msg.data));
-            }.bind(this);
+            ws.onclose = () => this.setState({ status: "disconnected" });
+            ws.onmessage = msg => this.setState(JSON.parse(msg.data));
             this.ws = ws;
         }
     }
@@ -252,7 +243,7 @@ class Vote extends Component {
         if (!this.room) {
             return <form action="/api/start_vote" method="post">
                 <label for="choices">Enter the choices up for vote, one per line:</label>
-                <textarea name="choices"></textarea>
+                <textarea name="choices" />
                 <input type="submit" value="Start Vote" />
             </form>
         } else if (state.status == "connecting") {
@@ -264,9 +255,7 @@ class Vote extends Component {
             return <footer>Invalid room!</footer>
         }
 
-        const on_input = function(event) {
-            this.setState({ voter_name: event.target.value });
-        }.bind(this);
+        const on_input = event => this.setState({ voter_name: event.target.value });
 
         let submitted_section = <div />;
         if (state.vote.your_vote) {
@@ -274,23 +263,21 @@ class Vote extends Component {
             submitted_section = <div>You submitted: {description}</div>;
         }
 
-        const submit = function() {
+        const submit = () => {
             const choices_component = this.choices_component.current;
             let items = [];
             let rank = 0;
             for (let i = 0; i < state.vote.choices.length; i++) {
                 let item = choices_component.state.order[i];
-                items.push({ candidate: item, rank: rank });
+                items.push({ candidate: item, rank });
                 if (choices_component.state.gt[i]) {
                     rank++;
                 }
             }
             this.ws.send(JSON.stringify({ vote: { name: this.state.voter_name, selections: items } }))
-        }.bind(this);
+        };
 
-        const tally = function() {
-            this.ws.send(JSON.stringify({ tally: null }));
-        }.bind(this);
+        const tally = () => this.ws.send(JSON.stringify({ tally: null }));
 
         let results = null;
         if (state.vote.results) {
