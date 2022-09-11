@@ -226,29 +226,23 @@ function VoteResults({ choices, results }) {
 }
 
 class Vote extends Component {
-    state = { status: "connecting", voter_name: "???" };
+    state = { room: null, status: "connecting", voter_name: "???" };
     ws = null;
-    room = null;
     choices_component = createRef();
-
-    constructor(props) {
-        super();
-        this.room = props.room;
-    }
 
     componentDidMount() {
         document.title = "Vote";
-        if (this.room) {
-            let ws = make_websocket(`/api/vote/${this.room}`);
-            ws.onclose = () => this.setState({ status: "disconnected" });
-            ws.onmessage = msg => this.setState(JSON.parse(msg.data));
-            this.ws = ws;
-        }
     }
 
-    render(_props, state) {
+    render(props, state) {
+        if (state.room != props.room) {
+            state.room = props.room;
+            this.ws = make_websocket(`/api/vote/${state.room}`);
+            this.ws.onclose = () => this.setState({ status: "disconnected" });
+            this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
+        }
         console.log(state);
-        if (!this.room) {
+        if (!state.room) {
             return <form action="/api/start_vote" method="post">
                 <label for="choices">Enter the choices up for vote, one per line:</label>
                 <textarea name="choices" />
