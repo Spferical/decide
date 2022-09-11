@@ -178,7 +178,7 @@ class Choices extends Component {
             const choice_class = this.state.selected == i ? "choice chosen" : "choice";
             const ondragstart = () => this.onDragStart(i);
             const ondragenter = () => this.onDragEnter(i);
-            choice = <button class={choice_class} draggable="true" onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</button>;
+            choice = <span role="button" class={choice_class} draggable="true" onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</span>;
             choices.push(choice);
             if (i + 1 != props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
