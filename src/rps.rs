@@ -313,6 +313,7 @@ pub async fn handle_rps_client(
         let mut gs = global_state.lock().await;
         let room = gs.rooms.get_mut(&room_id).unwrap();
         room.players.remove(&client_id);
+        room.clients.remove(&client_id);
         if room.players.is_empty() {
             gs.rooms.remove(&room_id);
         } else {
