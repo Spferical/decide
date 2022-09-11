@@ -62,11 +62,11 @@ class Rps extends Component {
             };
             components.push(
                 <div>
-                    <a href="#" role="button" onclick={get_onclick("rock")}>rock</a>
+                    <a href="javascript:void(0)" role="button" onclick={get_onclick("rock")}>rock</a>
                     {" "}
-                    <a href="#" role="button" onclick={get_onclick("paper")}>paper</a>
+                    <a href="javascript:void(0)" role="button" onclick={get_onclick("paper")}>paper</a>
                     {" "}
-                    <a href="#" role="button" onclick={get_onclick("scissors")}>scissors</a>
+                    <a href="javascript:void(0)" role="button" onclick={get_onclick("scissors")}>scissors</a>
                 </div>
             );
             if (player_view.choice) {
@@ -176,12 +176,12 @@ class Choices extends Component {
             const choice_class = this.state.selected == i ? "choice outline contrast" : "choice outline";
             const ondragstart = () => this.onDragStart(i);
             const ondragenter = () => this.onDragEnter(i);
-            choice = <a href="#" role="button" class={choice_class} onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</a>;
+            choice = <a href="javascript:void(0)" role="button" class={choice_class} onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</a>;
             choices.push(choice);
             if (i + 1 != props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
                 const symbol = this.state.gt[i] ? "<" : "=";
-                let order_elem = <a href="#" role="button" class="ordering secondary outline" onclick={rank_onclick}>{symbol}</a>;
+                let order_elem = <a href="javascript:void(0)" role="button" class="ordering secondary outline" onclick={rank_onclick}>{symbol}</a>;
                 choices.push(" ");
                 choices.push(order_elem);
                 choices.push(" ");
