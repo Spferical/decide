@@ -4,11 +4,18 @@ import { Component, createRef } from 'preact';
 import { route, Router } from 'preact-router';
 
 function Index() {
+    function rps() {
+        const room = crypto.randomUUID().substring(0, 5);
+        route(`/rps/${room}`);
+    };
+    function vote() {
+        route("/vote/");
+    };
     return (
         <main class="container">
             <section>
-                <h2><a href="rps">Rock Paper Scissors</a></h2>
-                <h2><a href="vote">Condorcet Voting</a></h2>
+                <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
+                <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
             </section>
         </main>
     )
@@ -27,12 +34,6 @@ class Rps extends Component {
 
     constructor(props) {
         super();
-        if (!props.room) {
-            const room = crypto.randomUUID().substring(0, 5);
-            // XXX: preact-router route() doesn't work on initial load.
-            // https://github.com/preactjs/preact-router/issues/417
-            setTimeout(() => route(`/rps/${room}`));
-        }
         this.room = props.room;
     }
 
@@ -50,9 +51,9 @@ class Rps extends Component {
     render(_props, state) {
         console.log(state);
         if (state.status == "connecting") {
-            return <footer id="status">Connecting...</footer>
+            return <footer>Connecting...</footer>
         } else if (state.status == "disconnected") {
-            return <footer id="status">Disconnected!</footer>
+            return <footer>Disconnected!</footer>
         }
         let components = [];
         let player_view = state.room_state.player_view;
@@ -106,7 +107,7 @@ class Rps extends Component {
         }
 
         components.push(
-            <footer id="status">{is_player ? "You are a player!" : "You are a spectator!"}</footer>
+            <footer>{is_player ? "You are a player!" : "You are a spectator!"}</footer>
         );
         return components;
     }
@@ -195,7 +196,6 @@ class Choices extends Component {
 }
 
 function VoteResults({ choices, results }) {
-    console.log(results);
     const winners = results.tally.winners.map(i => choices[i]).join(" AND ");
     const votes = results.votes.map(v => <li>{describe_vote(choices, v)}</li>);
     const tchoices = choices.map(c => <th scope="row">{c}</th>);
@@ -212,10 +212,10 @@ function VoteResults({ choices, results }) {
     return <article>
         <header>The results are in! The winner is: <strong>{winners}</strong></header>
         <p> The votes are: </p>
-        <ul id="votes">
+        <ul>
             {votes}
         </ul>
-        <table role="grid" id="defeats_matrix">
+        <table role="grid">
             {thead}
             {trows}
         </table>
@@ -256,9 +256,12 @@ class Vote extends Component {
                 <input type="submit" value="Start Vote" />
             </form>
         } else if (state.status == "connecting") {
-            return <footer id="status">Connecting...</footer>
+            return <footer>Connecting...</footer>
         } else if (state.status == "disconnected") {
-            return <footer id="status">Disconnected!</footer>
+            return <footer>Disconnected! Try refreshing.</footer>
+        } else if (state.status == "invalid_room") {
+            route("/vote");
+            return <footer>Invalid room!</footer>
         }
 
         const on_input = function(event) {
@@ -282,11 +285,11 @@ class Vote extends Component {
                     rank++;
                 }
             }
-            this.ws.send(JSON.stringify({ "vote": { "name": this.state.voter_name, "selections": items } }))
+            this.ws.send(JSON.stringify({ vote: { name: this.state.voter_name, selections: items } }))
         }.bind(this);
 
         const tally = function() {
-            this.ws.send(JSON.stringify({ "tally": null }));
+            this.ws.send(JSON.stringify({ tally: null }));
         }.bind(this);
 
         let results = null;
@@ -307,6 +310,7 @@ class Vote extends Component {
                 <button onclick={tally}>Tally the Votes</button>
                 <div>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</div>
                 {results}
+                <a href="/vote">Create a new election.</a>
             </section>
         );
     }
