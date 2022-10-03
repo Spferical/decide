@@ -191,7 +191,7 @@ class Choices extends Component {
             choices.push(choice);
             if (i + 1 != props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
-                const symbol = this.state.gt[i] ? "<" : "=";
+                const symbol = this.state.gt[i] ? ">" : "=";
                 let order_elem = <button class="ordering" onclick={rank_onclick}>{symbol}</button>;
                 choices.push(" ");
                 choices.push(order_elem);
