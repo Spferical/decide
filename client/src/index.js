@@ -215,8 +215,9 @@ function VoteResults({ choices, results }) {
         });
         return <tr key={i}><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
     });
+    let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
-        <header>The results are in! The winner is: <strong>{winners}</strong></header>
+        <header>The results are in! The {winner_desc}: <strong>{winners}</strong></header>
         <p> The votes are: </p>
         <ul>
             {votes}
