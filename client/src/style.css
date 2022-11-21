@@ -6,6 +6,7 @@
     border: 1px solid var(--accent);
     user-select: none;
     cursor: grab;
+    white-space: nowrap;
 }
 
 .chosen {

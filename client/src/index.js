@@ -182,9 +182,7 @@ class Choices extends Component {
     render(props, state) {
         let choices = [];
         for (let i = 0; i < props.choices.length; i++) {
-            // Render non-breaking spaces to prevent linewrapping choice names.
-            let choice = props.choices[state.order[i]].replace(/\s/g, "\u00A0");
-
+            let choice = props.choices[state.order[i]];
             const choice_onclick = () => this.onChoiceClick(i);
             const choice_class = this.state.selected == i ? "choice chosen" : "choice";
             const ondragstart = () => this.onDragStart(i);
