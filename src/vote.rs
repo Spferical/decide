@@ -18,7 +18,9 @@ use warp::{
 struct CondorcetTally {
     /// totals[a][b] contains the number of votes where candidate a beat b.
     totals: Vec<Vec<u64>>,
-    winners: Vec<usize>,
+    // Ranks[0] contains the winner(s), ranks[n] contains the winners if you
+    // remove the members of all previous ranks.
+    ranks: Vec<Vec<usize>>,
 }
 
 /// Check if b is reachable from a in a graph.
@@ -100,17 +102,20 @@ fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetTally
         }
     }
 
-    // Find winners, i.e. undefeated nodes.
-    let winners = (0..num_choices)
-        .into_iter()
-        .filter(|&c| {
-            !(0..num_choices)
-                .into_iter()
-                .any(|c2| defeat_graph[c2].contains(&c))
-        })
-        .collect();
+    let mut unranked = (0..num_choices).into_iter().collect::<Vec<_>>();
+    let mut ranks = vec![];
+    while !unranked.is_empty() {
+        // Find winners, i.e. undefeated nodes.
+        let winners: Vec<usize> = unranked
+            .iter()
+            .cloned()
+            .filter(|&c| !unranked.iter().any(|&c2| defeat_graph[c2].contains(&c)))
+            .collect();
+        unranked.retain(|c| !winners.contains(c));
+        ranks.push(winners);
+    }
 
-    CondorcetTally { totals, winners }
+    CondorcetTally { totals, ranks }
 }
 
 use crate::WebResult;
@@ -495,11 +500,11 @@ mod test {
                     (1: 2 > 1 > 3 > 0 > 4)
                 )
             )
-            .winners,
+            .ranks[0],
             vec![1, 3, 4],
         );
         assert_eq!(
-            ranked_pairs(2, ballots!((1: 0 > 1) (1: 1 > 0))).winners,
+            ranked_pairs(2, ballots!((1: 0 > 1) (1: 1 > 0))).ranks[0],
             vec![0, 1]
         );
 
@@ -509,14 +514,14 @@ mod test {
             (4:2>0>1)
             (2:1>2>0)
         );
-        assert_eq!(ranked_pairs(3, ericgorr_example_1).winners, [0]);
+        assert_eq!(ranked_pairs(3, ericgorr_example_1).ranks[0], [0]);
 
         let ericgorr_example_2 = ballots!(
             (40:0>1>2)
             (35:1>2>0)
             (25:2>0>1)
         );
-        assert_eq!(ranked_pairs(3, ericgorr_example_2).winners, [0]);
+        assert_eq!(ranked_pairs(3, ericgorr_example_2).ranks[0], [0]);
 
         let ericgorr_example_3 = ballots!(
             (7:0>1>2)
@@ -524,7 +529,7 @@ mod test {
             (2:2>0>1)
             (2:2>1>0)
         );
-        assert_eq!(ranked_pairs(3, ericgorr_example_3).winners, [0, 1]);
+        assert_eq!(ranked_pairs(3, ericgorr_example_3).ranks[0], [0, 1]);
 
         let ericgorr_example_4 = ballots!(
             (12:0>3>2>1)
@@ -535,7 +540,7 @@ mod test {
             (21:3>0>2>1)
             (6:3>1>0>2)
         );
-        assert_eq!(ranked_pairs(4, ericgorr_example_4).winners, [1]);
+        assert_eq!(ranked_pairs(4, ericgorr_example_4).ranks[0], [1]);
 
         let ericgorr_interesting_1 = ballots!(
             (12:0>3>2>1)
@@ -546,7 +551,7 @@ mod test {
             (21:3>0>2>1)
             (6:3>1>0>2)
         );
-        assert_eq!(ranked_pairs(4, ericgorr_interesting_1).winners, [1]);
+        assert_eq!(ranked_pairs(4, ericgorr_interesting_1).ranks[0], [1]);
 
         let ericgorr_interesting_2 = ballots!(
             (280:0>2>3>1)
@@ -554,6 +559,6 @@ mod test {
             (303:2>1>3>0)
             (356:3>0>1>2)
         );
-        assert_eq!(ranked_pairs(4, ericgorr_interesting_2).winners, [0]);
+        assert_eq!(ranked_pairs(4, ericgorr_interesting_2).ranks[0], [0]);
     }
 }

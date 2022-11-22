@@ -203,7 +203,6 @@ class Choices extends Component {
 }
 
 function VoteResults({ choices, results }) {
-    const winners = results.tally.winners.map(i => choices[i]).join(" AND ");
     const votes = results.votes.map((v, i) => <li key={i}>{describe_vote(choices, v)}</li>);
     const tchoices = choices.map((c, i) => <th key={i} scope="row">{c}</th>);
     const thead = <thead><tr><th key="head" scope="col" />{tchoices}</tr></thead>;
@@ -215,6 +214,10 @@ function VoteResults({ choices, results }) {
         });
         return <tr key={i}><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
     });
+    const ranks = results.tally.ranks.map(
+        rank => <li>{rank.map(c => choices[c]).join(" AND ")}</li>
+    );
+    const winners = results.tally.ranks[0].map(i => choices[i]).join(" AND ");
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
         <header>The results are in! The {winner_desc}: <strong>{winners}</strong></header>
@@ -226,6 +229,10 @@ function VoteResults({ choices, results }) {
             {thead}
             {trows}
         </table>
+        <p>The full ranks are:</p>
+        <ol>
+            {ranks}
+        </ol>
     </article>
 
 }
