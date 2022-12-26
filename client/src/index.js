@@ -217,7 +217,7 @@ function VoteResults({ choices, results }) {
     const ranks = results.tally.ranks.map(
         rank => <li>{rank.map(c => choices[c]).join(" AND ")}</li>
     );
-    const winners = results.tally.ranks[0].map(i => choices[i]).join(" AND ");
+    const winners = (results.tally.ranks[0] || []).map(i => choices[i]).join(" AND ");
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
         <header>The results are in! The {winner_desc}: <strong>{winners}</strong></header>
