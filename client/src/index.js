@@ -83,25 +83,27 @@ class Rps extends Component {
 
         return (
             <Fragment>
-                {is_player && <div>
-                    {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect.</p>}
-                    <p>
-                        <button onclick={get_onclick("rock")}>rock</button>
-                        {" "}
-                        <button onclick={get_onclick("paper")}>paper</button>
-                        {" "}
-                        <button onclick={get_onclick("scissors")}>scissors</button>
-                    </p>
-                    {player_view.choice && <p>You have selected: {player_view.choice}.</p>}
-                    {state.room_state.num_players >= 2 &&
-                        <p>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</p>}
-                    {!!(player_view.wins || player_view.losses || player_view.draws) &&
-                        <div>Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>}
-                </div>}
-                {!!spectator_view && !!(spectator_view.player_wins || spectator_view.draws) &&
-                    <div> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>
-                }
-                {history_component}
+                <main>
+                    {is_player && <div>
+                        {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect.</p>}
+                        <p>
+                            <button onclick={get_onclick("rock")}>rock</button>
+                            {" "}
+                            <button onclick={get_onclick("paper")}>paper</button>
+                            {" "}
+                            <button onclick={get_onclick("scissors")}>scissors</button>
+                        </p>
+                        {player_view.choice && <p>You have selected: {player_view.choice}.</p>}
+                        {state.room_state.num_players >= 2 &&
+                            <p>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</p>}
+                        {!!(player_view.wins || player_view.losses || player_view.draws) &&
+                            <div>Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>}
+                    </div>}
+                    {!!spectator_view && !!(spectator_view.player_wins || spectator_view.draws) &&
+                        <div> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>
+                    }
+                    {history_component}
+                </main>
                 <footer>
                     <div>There are {state.room_state.num_players} players and {state.room_state.num_spectators} spectators.</div>
                     <div>{is_player ? "You are a player!" : "You are a spectator!"}</div>
@@ -303,7 +305,7 @@ class Vote extends Component {
                 <p>Click or drag to edit your ballot.</p>
                 <Choices ref={this.choices_component} choices={state.vote.choices} />
                 <p>
-                    <label for="voter_name">Voter name:</label>
+                    <label for="voter_name">Voter name (optional):</label>
                     <input value={state.voter_name} onInput={on_input} />
                 </p>
                 <p><button onclick={submit}>Submit Your Vote</button></p>
@@ -312,12 +314,16 @@ class Vote extends Component {
 
         return (
             <Fragment>
-                {!state.vote.results && ballot_section}
-                {submitted_section}
-                {!state.vote.results && <p><button onclick={tally}>Tally the Votes</button></p>}
-                <p>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
-                {results}
-                <a href="/vote">Create a new election.</a>
+                <main>
+                    {!state.vote.results && ballot_section}
+                    {submitted_section}
+                    {!state.vote.results && <p><button onclick={tally}>End Voting and Show the Results</button></p>}
+                    <p>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
+                    {results}
+                </main>
+                <footer>
+                    <a href="/vote">Click here to create a new election.</a>
+                </footer>
             </Fragment>
         );
     }
@@ -325,12 +331,10 @@ class Vote extends Component {
 
 export default function App() {
     return (
-        <main>
-            <Router>
-                <Index path="/" />
-                <Rps path="/rps/:room?" />
-                <Vote path="/vote/:room?" />
-            </Router>
-        </main>
+        <Router>
+            <Index path="/" />
+            <Rps path="/rps/:room?" />
+            <Vote path="/vote/:room?" />
+        </Router>
     );
 }
