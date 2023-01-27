@@ -315,6 +315,7 @@ class Vote extends Component {
         return (
             <Fragment>
                 <main>
+                    {state.vote.num_players <= 1 && <p>Send this URL to all voters: <code>{window.location.href}</code></p>}
                     {!state.vote.results && ballot_section}
                     {submitted_section}
                     {!state.vote.results && <p><button onclick={tally}>End Voting and Show the Results</button></p>}
