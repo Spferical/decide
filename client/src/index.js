@@ -223,18 +223,21 @@ function VoteResults({ choices, results }) {
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
         <header>The results are in! The {winner_desc}: <strong>{winners}</strong></header>
-        <p> The votes are: </p>
-        <ul>
-            {votes}
-        </ul>
-        <table role="grid">
-            {thead}
-            {trows}
-        </table>
-        <p>The full ranks are:</p>
-        <ol>
-            {ranks}
-        </ol>
+        <details>
+            <summary>See detailed results</summary>
+            <p> The votes are: </p>
+            <ul>
+                {votes}
+            </ul>
+            <table role="grid">
+                {thead}
+                {trows}
+            </table>
+            <p>The full ranks are:</p>
+            <ol>
+                {ranks}
+            </ol>
+        </details>
     </article>
 
 }
