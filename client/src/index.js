@@ -262,7 +262,7 @@ class Vote extends Component {
         if (!state.room) {
             return <Fragment>
                 <h2>Condorcet Voting (Ranked Pairs)</h2>
-                <p><a href="https://en.wikipedia.org/wiki/Condorcet_method">What is this?</a></p>
+                <p><a href="https://en.wikipedia.org/wiki/Condorcet_method">What is Condorcet Voting?</a></p>
                 <form action="/api/start_vote" method="post">
                     <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
                     <p><textarea name="choices" /></p>
@@ -330,7 +330,8 @@ class Vote extends Component {
                     {results}
                 </main>
                 <footer>
-                    <a href="/vote">Click here to create a new election.</a>
+                    <p>The election will be deleted when everyone leaves.</p>
+                    <p><a href="/vote">Click here to create a new election.</a></p>
                 </footer>
             </Fragment>
         );
