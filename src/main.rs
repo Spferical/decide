@@ -11,6 +11,7 @@ type WebResult<T> = std::result::Result<T, Rejection>;
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init_timed();
+    let log = warp::log("decide");
     let addr = match std::env::args().nth(1) {
         Some(addr) => addr,
         None => {
@@ -51,6 +52,7 @@ async fn main() {
         .or(vote_route)
         .or(rps_route)
         .or(warp::fs::dir("static"))
-        .or(warp::fs::file("static/index.html"));
+        .or(warp::fs::file("static/index.html"))
+        .with(log);
     warp::serve(routes).run(addr).await
 }
