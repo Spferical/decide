@@ -1,4 +1,4 @@
-from rust:1.63 as builder
+from rust:1.67 as builder
 
 # cache dependencies by building project without source code
 run cargo new --bin decide
