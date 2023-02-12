@@ -1,23 +1,20 @@
-import { render } from 'preact';
-import { Component, createRef, Fragment } from 'preact';
+import { Component, createRef, Fragment, render } from 'preact';
 import { route, Router } from 'preact-router';
 
-class Index extends Component {
-    render() {
-        function rps() {
-            const room = crypto.randomUUID().substring(0, 5);
-            route(`/rps/${room}`);
-        }
-        function vote() {
-            route("/vote/");
-        }
-        return (
-            <main>
-                <h2><a href="javascript:void(0)" onClick={vote}>Condorcet Voting</a></h2>
-                <h2><a href="javascript:void(0)" onClick={rps}>Rock Paper Scissors</a></h2>
-            </main>
-        )
+function Index() {
+    function rps() {
+        const room = crypto.randomUUID().substring(0, 5);
+        route(`/rps/${room}`);
     }
+    function vote() {
+        route("/vote/");
+    }
+    return (
+        <main>
+            <h2><a href="javascript:void(0)" onClick={vote}>Condorcet Voting</a></h2>
+            <h2><a href="javascript:void(0)" onClick={rps}>Rock Paper Scissors</a></h2>
+        </main>
+    )
 }
 
 function make_websocket(path) {
@@ -201,18 +198,25 @@ class Choices extends Component {
 }
 
 function VoteResults({ choices, results }) {
-    const votes = results.votes.map((v, i) => <li key={i}>{describe_vote(choices, v)}</li>);
-    const tchoices = choices.map((c, i) => <th key={i} scope="row">{c}</th>);
+    // NOTE: no JSX keys here, vote results are static at the moment.
+    /* eslint-disable-next-line react/jsx-key */
+    const votes = results.votes.map(v => <li>{describe_vote(choices, v)}</li>);
+    /* eslint-disable-next-line react/jsx-key */
+    const tchoices = choices.map(c => <th scope="row">{c}</th>);
+    /* eslint-disable-next-line react/jsx-key */
     const thead = <thead><tr><th key="head" scope="col" />{tchoices}</tr></thead>;
     const totals = results.tally.totals;
     const trows = totals.map((_, i) => {
         const tds = totals[i].map((val, j) => {
             const symbol = (i == j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : val.toString();
-            return <td key={j}>{symbol}</td>
+            /* eslint-disable-next-line react/jsx-key */
+            return <td>{symbol}</td>
         });
-        return <tr key={i}><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
+        /* eslint-disable-next-line react/jsx-key */
+        return <tr><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
     });
     const ranks = results.tally.ranks.map(
+        /* eslint-disable-next-line react/jsx-key */
         rank => <li>{rank.map(c => choices[c]).join(" AND ")}</li>
     );
     const winners = (results.tally.ranks[0] || []).map(i => choices[i]).join(" AND ");
