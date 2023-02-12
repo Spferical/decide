@@ -17,8 +17,8 @@ class Index extends Component {
         }
         return (
             <main>
-                <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
                 <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
+                <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
             </main>
         )
     }
@@ -260,11 +260,15 @@ class Vote extends Component {
         }
         console.log(state);
         if (!state.room) {
-            return <form action="/api/start_vote" method="post">
-                <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
-                <p><textarea name="choices" /></p>
-                <input type="submit" value="Start Vote" />
-            </form>
+            return <Fragment>
+                <h2>Condorcet Voting (Ranked Pairs)</h2>
+                <p><a href="https://en.wikipedia.org/wiki/Condorcet_method">What is this?</a></p>
+                <form action="/api/start_vote" method="post">
+                    <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
+                    <p><textarea name="choices" /></p>
+                    <input type="submit" value="Start Vote" />
+                </form>
+            </Fragment>
         } else if (state.status == "connecting") {
             return <footer>Connecting...</footer>
         } else if (state.status == "disconnected") {
