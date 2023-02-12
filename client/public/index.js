@@ -1,12 +1,8 @@
-import './style.css';
+import { render } from 'preact';
 import { Component, createRef, Fragment } from 'preact';
 import { route, Router } from 'preact-router';
 
 class Index extends Component {
-    componentDidMount() {
-        document.title = "Decide"
-    }
-
     render() {
         function rps() {
             const room = crypto.randomUUID().substring(0, 5);
@@ -17,8 +13,8 @@ class Index extends Component {
         }
         return (
             <main>
-                <h2><a href="javascript:void(0)" onclick={vote}>Condorcet Voting</a></h2>
-                <h2><a href="javascript:void(0)" onclick={rps}>Rock Paper Scissors</a></h2>
+                <h2><a href="javascript:void(0)" onClick={vote}>Condorcet Voting</a></h2>
+                <h2><a href="javascript:void(0)" onClick={rps}>Rock Paper Scissors</a></h2>
             </main>
         )
     }
@@ -87,11 +83,11 @@ class Rps extends Component {
                     {is_player && <div>
                         {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect.</p>}
                         <p>
-                            <button onclick={get_onclick("rock")}>rock</button>
+                            <button onClick={get_onclick("rock")}>rock</button>
                             {" "}
-                            <button onclick={get_onclick("paper")}>paper</button>
+                            <button onClick={get_onclick("paper")}>paper</button>
                             {" "}
-                            <button onclick={get_onclick("scissors")}>scissors</button>
+                            <button onClick={get_onclick("scissors")}>scissors</button>
                         </p>
                         {player_view.choice && <p>You have selected: {player_view.choice}.</p>}
                         {state.room_state.num_players >= 2 &&
@@ -189,12 +185,12 @@ class Choices extends Component {
             const choice_class = this.state.selected == i ? "choice chosen" : "choice";
             const ondragstart = () => this.onDragStart(i);
             const ondragenter = () => this.onDragEnter(i);
-            choice = <span role="button" class={choice_class} draggable="true" onclick={choice_onclick} ondragstart={ondragstart} ondragenter={ondragenter}>{choice}</span>;
+            choice = <span role="button" class={choice_class} draggable={true} onClick={choice_onclick} onDragStart={ondragstart} onDragEnter={ondragenter}>{choice}</span>;
             choices.push(choice);
             if (i + 1 != props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
                 const symbol = this.state.gt[i] ? ">" : "=";
-                let order_elem = <button class="ordering" onclick={rank_onclick}>{symbol}</button>;
+                let order_elem = <button class="ordering" onClick={rank_onclick}>{symbol}</button>;
                 choices.push(" ");
                 choices.push(order_elem);
                 choices.push(" ");
@@ -315,7 +311,7 @@ class Vote extends Component {
                     <label for="voter_name">Voter name (optional):</label>
                     <input value={state.voter_name} onInput={on_input} />
                 </p>
-                <p><button onclick={submit}>Submit Your Vote</button></p>
+                <p><button onClick={submit}>Submit Your Vote</button></p>
             </Fragment>
         );
 
@@ -325,7 +321,7 @@ class Vote extends Component {
                     {state.vote.num_players <= 1 && <p>Send this URL to all voters: <code>{window.location.href}</code></p>}
                     {!state.vote.results && ballot_section}
                     {submitted_section}
-                    {!state.vote.results && <p><button onclick={tally}>End Voting and Show the Results</button></p>}
+                    {!state.vote.results && <p><button onClick={tally}>End Voting and Show the Results</button></p>}
                     <p>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
                     {results}
                 </main>
@@ -347,3 +343,5 @@ export default function App() {
         </Router>
     );
 }
+
+render(<App />, document.body);

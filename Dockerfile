@@ -14,7 +14,7 @@ run rm ./target/release/deps/decide-*
 run cargo install --path . --locked
 
 # build the client
-from node:16 as clientbuilder
+from node:18 as clientbuilder
 env NODE_ENV=production
 workdir ./app
 copy ./client/package.json ./client/package-lock.json ./
@@ -26,7 +26,7 @@ FROM debian:buster-slim
 env DEBIAN_FRONTEND=noninteractive
 run apt update && apt install -y dumb-init && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/cargo/bin/decide /usr/local/bin/decide
-COPY --from=clientbuilder app/build static
+COPY --from=clientbuilder app/dist static
 
 run groupadd decide && useradd -g decide decide
 user decide
