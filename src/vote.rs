@@ -40,7 +40,12 @@ fn is_reachable(a: usize, b: usize, graph: &[HashSet<usize>]) -> bool {
     false
 }
 
+/// Compute the results of an election using the ranked pairs method.
 fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetTally {
+    // See http://ericgorr.net/condorcet/rankedpairs/
+
+    // Compute the pairwise matrix, totals.
+    // totals[a][b] = the number of votes ranking candidate a over candidate b.
     let mut totals = vec![vec![0; num_choices]; num_choices];
     for mut vote in votes.into_iter() {
         vote.sort_by_key(|item| item.rank);
@@ -54,7 +59,9 @@ fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetTally
         }
     }
 
-    // Sequence of (winner, loser), sorted by strength of victory, then margin.
+    // Compute the ranked pairs, a sequence of (winner, loser), sorted by:
+    // 1. strength of victory (number of votes favoring a over b)
+    // 2. margin (difference in voters favoring a vs favoring b)
     let mut defeats = (0..num_choices)
         .into_iter()
         .flat_map(|c| {
@@ -72,6 +79,7 @@ fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetTally
     // defeat_graph[a].contains(&b) iff a defeats b.
     let mut defeat_graph = vec![HashSet::new(); num_choices];
 
+    // Defeats are grouped with all equivalent defeats (by strength/margin).
     for (_key, current_defeats) in defeats
         .into_iter()
         .group_by(|&(a, b)| (totals[a][b], totals[b][a]))
