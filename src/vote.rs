@@ -6,7 +6,7 @@ use std::{
 
 use futures_util::{SinkExt, StreamExt};
 use itertools::Itertools as _;
-use rand::Rng;
+use rand::distributions::DistString;
 use tokio::sync::{mpsc, Mutex};
 use warp::{
     hyper::Uri,
@@ -137,7 +137,7 @@ struct RoomId(String);
 
 impl RoomId {
     fn new_random() -> Self {
-        Self(format!("{:x}", rand::thread_rng().gen::<u32>()))
+        Self(rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), 8))
     }
 }
 
