@@ -219,10 +219,10 @@ function VoteResults({ choices, results }) {
         /* eslint-disable-next-line react/jsx-key */
         rank => <li>{rank.map(c => choices[c]).join(" AND ")}</li>
     );
-    const winners = (results.tally.ranks[0] || []).map(i => choices[i]).join(" AND ");
+    const winners = (results.tally.ranks[0] || []).map(i => choices[i]);
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
-        <header>The results are in! The {winner_desc}: <strong>{winners}</strong></header>
+        <header>The results are in! The {winner_desc}: <strong>{winners.join(" AND ")}</strong></header>
         <details>
             <summary>See detailed results</summary>
             <p> The votes are: </p>
