@@ -307,6 +307,8 @@ class Vote extends Component {
             results = <VoteResults choices={state.vote.choices} results={state.vote.results} />
         }
 
+        const submit_text = (state.vote.your_vote) ? "Resubmit Your Vote" : "Submit Your Vote";
+
         const ballot_section = (
             <Fragment>
                 <p>Click or drag to edit your ballot.</p>
@@ -315,7 +317,7 @@ class Vote extends Component {
                     <label for="voter_name">Voter name (optional):</label>
                     <input value={state.voter_name} onInput={on_input} />
                 </p>
-                <p><button onClick={submit}>Submit Your Vote</button></p>
+                <p><button onClick={submit}>{submit_text}</button></p>
             </Fragment>
         );
 
