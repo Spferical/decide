@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 use futures_util::{SinkExt, StreamExt};
 use rand::distributions::DistString;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{watch, Mutex};
 use warp::{
     hyper::Uri,
     ws::{Message, WebSocket},
@@ -41,7 +41,8 @@ struct Room {
 }
 
 struct ClientInfo {
-    tx: mpsc::Sender<api::ClientNotification>,
+    // Note: this option is initially None, but all .changed() values must be Some(_).
+    tx: watch::Sender<Option<api::ClientNotification>>,
 }
 
 pub struct VoteState {
@@ -57,27 +58,32 @@ impl VoteState {
         }
     }
 
+    fn get_client_notification(
+        &self,
+        client_id: &ClientId,
+        room: &Room,
+    ) -> api::ClientNotification {
+        api::ClientNotification {
+            status: api::ClientStatus::Connected,
+            vote: Some(api::VoteView {
+                choices: room.choices.clone(),
+                your_vote: room.votes.get(client_id).cloned(),
+                num_votes: room.votes.len(),
+                results: room.results.as_ref().map(|tally| api::VotingResults {
+                    tally: tally.clone(),
+                    votes: room.votes.values().cloned().collect(),
+                }),
+                num_players: room.clients.len(),
+            }),
+        }
+    }
+
     async fn broadcast_state(&self, room_id: &RoomId) {
         let room = self.rooms.get(room_id).unwrap();
         for (client_id, client_info) in room.clients.iter() {
             client_info
                 .tx
-                .send(api::ClientNotification {
-                    status: api::ClientStatus::Connected,
-                    vote: Some(api::VoteView {
-                        choices: room.choices.clone(),
-                        your_vote: room.votes.get(client_id).cloned(),
-                        num_votes: room.votes.len(),
-                        results: room.results.as_ref().map(|tally| api::VotingResults {
-                            tally: tally.clone(),
-                            votes: room.votes.values().cloned().collect(),
-                        }),
-                        num_players: room.clients.len(),
-                    }),
-                })
-                .await
-                // Ignore send errors; player could have dropped.
-                .ok();
+                .send_replace(Some(self.get_client_notification(client_id, room)));
         }
     }
 
@@ -120,9 +126,9 @@ pub async fn handle_vote_client(
     room_id: String,
     mut ws: WebSocket,
 ) {
-    let (tx, mut rx) = mpsc::channel(1);
     let room_id = RoomId(room_id);
     let client_id;
+    let (tx, mut rx) = watch::channel(None);
     {
         let mut gs = global_state.lock().await;
         client_id = gs.get_new_client_id();
@@ -130,7 +136,7 @@ pub async fn handle_vote_client(
             room
         } else {
             log::debug!("client {client_id:?} gave invalid room {room_id}");
-            ws.send(Message::text(
+            ws.feed(Message::text(
                 serde_json::to_string(&api::ClientNotification {
                     status: api::ClientStatus::InvalidRoom,
                     vote: None,
@@ -141,9 +147,10 @@ pub async fn handle_vote_client(
             .ok();
             return;
         };
+        // Note: this notification is immediately clobbered by broadcast_state().
         room.clients.insert(client_id, ClientInfo { tx });
         gs.broadcast_state(&room_id).await;
-    }
+    };
     log::debug!("client {client_id:?} connected to room {room_id}");
     let on_command = |global_state: Arc<Mutex<VoteState>>, room_id, client_id, command| async move {
         log::debug!("Got command: {:?}", command);
@@ -186,17 +193,20 @@ pub async fn handle_vote_client(
     };
     loop {
         tokio::select! {
-            msg = rx.recv() => match msg {
-                Some(msg) => {
-                    log::debug!("Sending message: {:?}", msg);
-                    let msg = serde_json::to_string(&msg).unwrap();
-                    if let Err(err) = ws.send(Message::text(msg)).await {
+            changed = rx.changed() => match changed {
+                Ok(()) => {
+                    let serialized_msg = {
+                        let borrowed_msg = rx.borrow_and_update();
+                        serde_json::to_string(borrowed_msg.as_ref().unwrap()).unwrap()
+                    };
+                    log::debug!("Sending message: {:?}", serialized_msg);
+                    if let Err(err) = ws.send(Message::text(serialized_msg)).await {
                         log::debug!("Error sending message to client: {}", err);
                         break
                     }
                 },
-                // server must be shutting down
-                None => break,
+                // Sender was dropped; server must be shutting down.
+                Err(_) => break,
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
