@@ -3,6 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use warp::{Filter, Rejection};
 
+mod condorcet;
 mod rps;
 mod vote;
 
