@@ -44,6 +44,21 @@ fn is_reachable(a: usize, b: usize, graph: &[HashSet<usize>]) -> bool {
 fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetTally {
     // See http://ericgorr.net/condorcet/rankedpairs/
 
+    // Validate input. Contents of votes are user-controlled.
+    let votes: Vec<Vec<VoteItem>> = votes
+        .into_iter()
+        .map(|mut ballot| {
+            let mut seen_candidates = vec![false; num_choices];
+            // Filter invalid and duplicate candidates.
+            ballot.retain(|item| {
+                item.candidate < num_choices
+                    && std::mem::replace(&mut seen_candidates[item.candidate], true)
+            });
+
+            ballot
+        })
+        .collect();
+
     // Compute the pairwise matrix, totals.
     // totals[a][b] = the number of votes ranking candidate a over candidate b.
     let mut totals = vec![vec![0; num_choices]; num_choices];
