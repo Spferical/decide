@@ -58,6 +58,15 @@ pub enum Command {
     Tally,
 }
 
+impl Command {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Vote(_) => "vote",
+            Self::Tally => "tally",
+        }
+    }
+}
+
 /// Data serialized and sent to the client in response to a command or other change in state.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClientNotification {

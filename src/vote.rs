@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc, time::Instant};
 
 use futures_util::{SinkExt, StreamExt};
 use rand::distributions::DistString;
@@ -217,6 +217,8 @@ pub async fn handle_vote_client(
                     match msg.to_str() {
                         Ok(msg) => match serde_json::from_str::<api::Command>(msg) {
                             Ok(command) => {
+                                let command_start = Instant::now();
+                                let command_name = api::Command::name(&command);
                                 on_command(
                                     global_state.clone(),
                                     room_id.clone(),
@@ -224,6 +226,8 @@ pub async fn handle_vote_client(
                                     command
                                 )
                                 .await;
+                                let elapsed = Instant::now() - command_start;
+                                log::info!("client_{} {command_name} {elapsed:?}", client_id.0);
                             },
                             Err(e) => {
                                 log::debug!("Bad message: {:?}: {:?}", msg, e);
