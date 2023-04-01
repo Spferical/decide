@@ -255,7 +255,11 @@ class Vote extends Component {
         if (state.room != props.room) {
             state.room = props.room;
             this.ws = make_websocket(`/api/vote/${state.room}`);
-            this.ws.onclose = () => this.setState({ status: "disconnected" });
+            this.ws.onclose = function(evt) {
+                console.log("Websocket disconnected!");
+                console.log(evt);
+                this.setState({ status: "disconnected" });
+            }.bind(this);
             this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
         }
         console.log(state);
