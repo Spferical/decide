@@ -13,7 +13,6 @@ run cargo build --release --locked
 run rm decide/src/*.rs api/src/*.rs
 add ./decide ./decide
 add ./api ./api
-run cat ./api/src/lib.rs
 # FIXME: there's gotta be something better than this to force cargo to rebuild
 run rm ./target/release/**/*decide*
 run cargo install --path decide --locked
