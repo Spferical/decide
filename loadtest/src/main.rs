@@ -112,7 +112,12 @@ async fn client_work(
                         let command = serde_json::to_string(&command)
                             .expect("Failed to serialize command");
                         ws.send(Message::Text(command)).await.ok();
-                        waiting_on_status.push(tx);
+                        if status.vote.as_ref().filter(|v| v.results.is_some()).is_some() {
+                            // If results are already in, we might not get a response.
+                            tx.send(()).ok();
+                        } else {
+                            waiting_on_status.push(tx);
+                        }
                     }
                     None => {
                         break;
@@ -132,17 +137,17 @@ async fn client_work(
                         }
                     }
                     None => {
-                        log::trace!("Websocket connection closed");
+                        log::debug!("Websocket connection closed");
                         break
                     },
                     msg => {
-                        log::trace!("Got unexpected websocket message: {msg:?}");
+                        log::debug!("Got unexpected websocket message: {msg:?}");
                     },
                 }
             }
         }
     }
-    ws.close(None).await.unwrap();
+    ws.close(None).await.ok();
 }
 
 impl VoteClient {
@@ -179,38 +184,77 @@ async fn main() {
         .filter(|arg| ["-s", "--secure"].contains(&arg.as_str()))
         .next()
         .is_some();
-    let mut http_client = reqwest::Client::new();
     let total_requests = Arc::new(AtomicU64::new(0));
-    let mut client_futures = vec![];
-    for _ in 0..10 {
-        let vote_id = make_vote(&mut http_client, &base_url, secure).await;
-        for _ in 0..10 {
-            let vote_client = VoteClient::connect(&base_url, &vote_id, secure).await;
-            let total_requests_clone = Arc::clone(&total_requests);
-            client_futures.push(async move {
-                loop {
-                    vote_client.vote_randomly().await.unwrap();
-                    if 10_000_u64 < total_requests_clone.fetch_add(1, Ordering::Relaxed) {
-                        vote_client.tally().await.unwrap();
-                        break;
-                    }
-                }
-            });
+
+    let num_rooms = 100;
+    let num_clients_per_room = 10;
+
+    // Create rooms.
+    let mut http_client = reqwest::Client::new();
+    let mut rooms = vec![];
+    for _ in 0..num_rooms {
+        rooms.push(make_vote(&mut http_client, &base_url, secure).await);
+    }
+    let rooms_done_timestamp = Instant::now();
+    eprintln!(
+        "Created {} rooms in {:?}",
+        rooms.len(),
+        rooms_done_timestamp - start
+    );
+
+    // Create and connect clients to each room.
+    let mut client_futs = vec![];
+    for room in rooms {
+        for _ in 0..num_clients_per_room {
+            let base_url1 = base_url.clone();
+            let room1 = room.clone();
+            client_futs.push(async move { VoteClient::connect(&base_url1, &room1, secure).await });
         }
     }
-    // Delay spawning these futures to prevent clients trying to join after
-    // other clients leave.
+    let clients = futures::future::join_all(client_futs).await;
+    let clients_connected_timestamp = Instant::now();
+    eprintln!(
+        "Created {} clients in {:?}",
+        clients.len(),
+        clients_connected_timestamp - rooms_done_timestamp
+    );
+
+    // Spawn client work.
+    let mut client_tasks = vec![];
+    for client in clients.into_iter() {
+        let total_requests_clone = Arc::clone(&total_requests);
+        client_tasks.push(async move {
+            log::debug!("Client running");
+            loop {
+                client.vote_randomly().await.unwrap();
+                if 10_000_u64 < total_requests_clone.fetch_add(1, Ordering::Relaxed) {
+                    client.tally().await.unwrap();
+                    break;
+                }
+            }
+        });
+    }
     let mut client_join_set = tokio::task::JoinSet::new();
-    for client_fut in client_futures.drain(..) {
+    for client_fut in client_tasks.drain(..) {
         client_join_set.spawn(client_fut);
     }
+
+    // Wait until all clients are done.
+    let mut joined_clients = 0;
     while let Some(res) = client_join_set.join_next().await {
+        joined_clients += 1;
+        log::debug!(
+            "Joined client {joined_clients}/{}",
+            num_rooms * num_clients_per_room
+        );
         if let Err(err) = res {
             eprintln!("Thread panicked: {:?}", err);
         }
     }
     let end = Instant::now();
-    let duration = end - start;
     let total_requests = total_requests.load(Ordering::Relaxed);
-    eprintln!("Performed {total_requests} requests in {duration:?}");
+    eprintln!(
+        "Performed {total_requests} requests in {:?}",
+        end - clients_connected_timestamp
+    );
 }
