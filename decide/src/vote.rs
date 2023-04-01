@@ -166,6 +166,10 @@ pub async fn handle_vote_client(
             api::Command::Tally => {
                 let mut gs = global_state.lock().await;
                 let room = gs.rooms.get_mut(&room_id).unwrap();
+                if room.results.is_some() {
+                    // No need to recalculate.
+                    return;
+                }
                 let num_choices = room.choices.len();
                 let votes: Vec<Vec<crate::condorcet::VoteItem>> = room
                     .votes
