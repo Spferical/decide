@@ -50,28 +50,44 @@ impl VoteClient {
             .map_err(|_| VoteClientError::Disconnected)?;
         rx.await.map_err(|_| VoteClientError::Disconnected)
     }
+    async fn tally(&self) -> Result<(), VoteClientError> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.ctrl_channel
+            .send(ClientReq::Tally(tx))
+            .await
+            .map_err(|_| VoteClientError::Disconnected)?;
+        rx.await.map_err(|_| VoteClientError::Disconnected)
+    }
 }
 
+#[derive(Debug)]
 enum ClientReq {
     GetStatus(tokio::sync::oneshot::Sender<Arc<api::ClientNotification>>),
     VoteRandomly(tokio::sync::oneshot::Sender<()>),
+    Tally(tokio::sync::oneshot::Sender<()>),
 }
 
 async fn client_work(
     init_state: api::ClientNotification,
     mut ws: ClientStream,
-    mut chan: tokio::sync::mpsc::Receiver<ClientReq>,
+    mut req_rx: tokio::sync::mpsc::Receiver<ClientReq>,
 ) {
     let mut status: Arc<api::ClientNotification> = Arc::new(init_state);
+    let mut waiting_on_status = vec![];
     loop {
         tokio::select! {
-            req = chan.recv() => {
+            req = req_rx.recv() => {
                 match req {
                     Some(ClientReq::GetStatus(tx)) => {
                         tx.send(status.clone()).ok();
                     }
                     Some(ClientReq::VoteRandomly(tx)) => {
-                        let num_candidates = status.vote.as_ref().expect("No vote active").choices.len();
+                        let num_candidates = status
+                            .vote
+                            .as_ref()
+                            .expect("No vote active")
+                            .choices
+                            .len();
                         let command = {
                             let mut rng = rand::thread_rng();
                             let vote: Vec<api::VoteItem> = (0..num_candidates)
@@ -80,31 +96,52 @@ async fn client_work(
                                     rank: rng.gen_range(0..num_candidates as u64),
                                 })
                                 .collect();
-                            let name = String::from(*["Fred", "Joe", "???"].choose(&mut rng).unwrap());
+                            let name = String::from(
+                                *["Fred", "Joe", "???"].choose(&mut rng).unwrap());
                             api::Command::Vote(api::UserVote{name, selections: vote})
                         };
-                        let command = serde_json::to_string(&command).expect("Failed to serialize command");
+                        let command = serde_json::to_string(&command)
+                            .expect("Failed to serialize command");
                         // Note: if websocket closes, it should be caught on the receive side.
                         ws.send(Message::Text(command)).await.ok();
-                        tx.send(()).ok();
+                        waiting_on_status.push(tx);
                     }
-                    None => break
+                    Some(ClientReq::Tally(tx)) => {
+                        let command = api::Command::Tally;
+                        let command = serde_json::to_string(&command)
+                            .expect("Failed to serialize command");
+                        ws.send(Message::Text(command)).await.ok();
+                        waiting_on_status.push(tx);
+                    }
+                    None => {
+                        break;
+                    }
                 }
             }
             msg = ws.next() => {
                 match msg {
                     Some(Ok(Message::Text(txt))) => {
-                        let notification: api::ClientNotification =serde_json::from_str(&txt).unwrap();
+                        let notification: api::ClientNotification =
+                            serde_json::from_str(&txt).unwrap();
                         // Errors can only happen on initial sync.
                         assert!(matches!(notification.status, api::ClientStatus::Connected));
                         status = Arc::new(notification);
+                        for tx in waiting_on_status.drain(..) {
+                            tx.send(()).ok();
+                        }
                     }
-                    None => break,
-                    _ => {},
+                    None => {
+                        log::trace!("Websocket connection closed");
+                        break
+                    },
+                    msg => {
+                        log::trace!("Got unexpected websocket message: {msg:?}");
+                    },
                 }
             }
         }
     }
+    ws.close(None).await.unwrap();
 }
 
 impl VoteClient {
@@ -113,7 +150,7 @@ impl VoteClient {
         let mut ws = tokio_tungstenite::connect_async(url).await.unwrap().0;
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         // wait on initial sync
-        let init_state = loop {
+        let init_state: api::ClientNotification = loop {
             match ws.next().await {
                 Some(Ok(Message::Text(txt))) => {
                     break serde_json::from_str(&txt).expect("Invalid initial sync");
@@ -122,6 +159,10 @@ impl VoteClient {
             }
         };
 
+        if !init_state.vote.is_some() {
+            panic!("Got initial state: {init_state:?}");
+        }
+
         tokio::spawn(client_work(init_state, ws, rx));
         VoteClient { ctrl_channel: tx }
     }
@@ -129,6 +170,7 @@ impl VoteClient {
 
 #[tokio::main]
 async fn main() {
+    pretty_env_logger::init_timed();
     let start = Instant::now();
     let base_url = std::env::args().nth(1).unwrap();
     let mut http_client = reqwest::Client::new();
@@ -143,6 +185,7 @@ async fn main() {
                 loop {
                     vote_client.vote_randomly().await.unwrap();
                     if 1_000_000_u64 < total_requests_clone.fetch_add(1, Ordering::Relaxed) {
+                        vote_client.tally().await.unwrap();
                         break;
                     }
                 }
