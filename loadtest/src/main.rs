@@ -15,8 +15,9 @@ use decide_api as api;
 
 type ClientStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-async fn make_vote(client: &mut reqwest::Client, base_url: &str) -> String {
-    let url = format!("http://{base_url}/api/start_vote");
+async fn make_vote(client: &mut reqwest::Client, base_url: &str, secure: bool) -> String {
+    let proto = if secure { "https" } else { "http" };
+    let url = format!("{proto}://{base_url}/api/start_vote");
     let body = "choices=a%0D%0Ab%0D%0Ac";
     let response = client.post(url).body(body).send().await.unwrap();
     response.url().path().split('/').last().unwrap().into()
@@ -145,8 +146,9 @@ async fn client_work(
 }
 
 impl VoteClient {
-    async fn connect(base_url: &str, vote_id: &str) -> Self {
-        let url = format!("ws://{base_url}/api/vote/{vote_id}");
+    async fn connect(base_url: &str, vote_id: &str, secure: bool) -> Self {
+        let proto = if secure { "wss" } else { "ws" };
+        let url = format!("{proto}://{base_url}/api/vote/{vote_id}");
         let mut ws = tokio_tungstenite::connect_async(url).await.unwrap().0;
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         // wait on initial sync
@@ -173,13 +175,17 @@ async fn main() {
     pretty_env_logger::init_timed();
     let start = Instant::now();
     let base_url = std::env::args().nth(1).unwrap();
+    let secure = std::env::args()
+        .filter(|arg| ["-s", "--secure"].contains(&arg.as_str()))
+        .next()
+        .is_some();
     let mut http_client = reqwest::Client::new();
     let mut client_join_set = tokio::task::JoinSet::new();
     let total_requests = Arc::new(AtomicU64::new(0));
     for _ in 0..10 {
-        let vote_id = make_vote(&mut http_client, &base_url).await;
+        let vote_id = make_vote(&mut http_client, &base_url, secure).await;
         for _ in 0..10 {
-            let vote_client = VoteClient::connect(&base_url, &vote_id).await;
+            let vote_client = VoteClient::connect(&base_url, &vote_id, secure).await;
             let total_requests_clone = Arc::clone(&total_requests);
             client_join_set.spawn(async move {
                 loop {
