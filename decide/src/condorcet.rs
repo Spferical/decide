@@ -45,7 +45,7 @@ pub fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetT
             // Filter invalid and duplicate candidates.
             ballot.retain(|item| {
                 item.candidate < num_choices
-                    && std::mem::replace(&mut seen_candidates[item.candidate], true)
+                    && !std::mem::replace(&mut seen_candidates[item.candidate], true)
             });
 
             ballot
