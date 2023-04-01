@@ -180,14 +180,14 @@ async fn main() {
         .next()
         .is_some();
     let mut http_client = reqwest::Client::new();
-    let mut client_join_set = tokio::task::JoinSet::new();
     let total_requests = Arc::new(AtomicU64::new(0));
+    let mut client_futures = vec![];
     for _ in 0..10 {
         let vote_id = make_vote(&mut http_client, &base_url, secure).await;
         for _ in 0..10 {
             let vote_client = VoteClient::connect(&base_url, &vote_id, secure).await;
             let total_requests_clone = Arc::clone(&total_requests);
-            client_join_set.spawn(async move {
+            client_futures.push(async move {
                 loop {
                     vote_client.vote_randomly().await.unwrap();
                     if 1_000_000_u64 < total_requests_clone.fetch_add(1, Ordering::Relaxed) {
@@ -197,6 +197,12 @@ async fn main() {
                 }
             });
         }
+    }
+    // Delay spawning these futures to prevent clients trying to join after
+    // other clients leave.
+    let mut client_join_set = tokio::task::JoinSet::new();
+    for client_fut in client_futures.drain(..) {
+        client_join_set.spawn(client_fut);
     }
     while let Some(res) = client_join_set.join_next().await {
         if let Err(err) = res {
