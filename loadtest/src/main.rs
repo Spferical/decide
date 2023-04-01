@@ -190,7 +190,7 @@ async fn main() {
             client_futures.push(async move {
                 loop {
                     vote_client.vote_randomly().await.unwrap();
-                    if 1_000_000_u64 < total_requests_clone.fetch_add(1, Ordering::Relaxed) {
+                    if 10_000_u64 < total_requests_clone.fetch_add(1, Ordering::Relaxed) {
                         vote_client.tally().await.unwrap();
                         break;
                     }
