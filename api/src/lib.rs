@@ -22,6 +22,7 @@ pub struct VoteItem {
 pub enum ClientStatus {
     Connected,
     InvalidRoom,
+    InvalidUuid,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +43,12 @@ pub struct VoteView {
 #[derive(Deserialize)]
 pub struct NewVoteForm {
     pub choices: String,
+}
+
+#[derive(Deserialize)]
+pub struct VoteWebsocketQueryParams {
+    /// Unique per client per room. Used to allow reconnections.
+    pub id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -11,6 +11,7 @@
 	},
 	"dependencies": {
 		"http-proxy-middleware": "^2.0.6",
+		"js-cookie": "^3.0.1",
 		"preact": "^10.12.1",
 		"preact-iso": "^2.3.1",
 		"simpledotcss": "^2.1.1",

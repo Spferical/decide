@@ -1,8 +1,10 @@
 use std::{collections::HashMap, hash::Hash, sync::Arc, time::Instant};
 
+use api::VoteWebsocketQueryParams;
 use futures_util::{SinkExt, StreamExt};
 use rand::distributions::DistString;
 use tokio::sync::{watch, Mutex};
+use uuid::Uuid;
 use warp::{
     hyper::Uri,
     ws::{Message, WebSocket},
@@ -15,7 +17,7 @@ use crate::{condorcet::ranked_pairs, WebResult};
 
 /// Each websocket connection is a unique player.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct ClientId(u64);
+struct ClientId(Uuid);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct RoomId(String);
@@ -34,27 +36,60 @@ impl std::fmt::Display for RoomId {
 
 #[derive(Default)]
 struct Room {
-    clients: HashMap<ClientId, ClientInfo>,
+    // Each client may have multiple tabs open.
+    clients: HashMap<ClientId, Vec<ConnectionHandle>>,
     choices: Vec<String>,
     votes: HashMap<ClientId, api::UserVote>,
     results: Option<api::CondorcetTally>,
 }
 
-struct ClientInfo {
+/// Handle to the async task managing one client's websocket connection.
+struct ConnectionHandle {
     // Note: this option is initially None, but all .changed() values must be Some(_).
     tx: watch::Sender<Option<api::ClientNotification>>,
 }
 
 pub struct VoteState {
     rooms: HashMap<RoomId, Room>,
-    next_client_id: u64,
 }
 
 impl VoteState {
     pub fn new() -> Self {
         Self {
             rooms: HashMap::new(),
-            next_client_id: 1,
+        }
+    }
+
+    async fn create_room(&mut self, choices: Vec<String>) -> RoomId {
+        let room_id = RoomId::new_random();
+        self.rooms.insert(
+            room_id.clone(),
+            Room {
+                choices,
+                votes: HashMap::new(),
+                clients: HashMap::new(),
+                results: None,
+            },
+        );
+        room_id
+    }
+
+    /// Returns false if the room does not exist, else true.
+    async fn register_client(
+        &mut self,
+        room_id: &RoomId,
+        client_id: ClientId,
+        tx: watch::Sender<Option<api::ClientNotification>>,
+    ) -> bool {
+        if let Some(room) = self.rooms.get_mut(room_id) {
+            room.clients
+                .entry(client_id)
+                .or_default()
+                .push(ConnectionHandle { tx });
+            self.broadcast_state(&room_id).await;
+            true
+        } else {
+            false
         }
     }
 
@@ -80,16 +115,13 @@ impl VoteState {
 
     async fn broadcast_state(&self, room_id: &RoomId) {
         let room = self.rooms.get(room_id).unwrap();
-        for (client_id, client_info) in room.clients.iter() {
-            client_info
-                .tx
-                .send_replace(Some(self.get_client_notification(client_id, room)));
+        for (client_id, client_infos) in room.clients.iter() {
+            for client_info in client_infos.iter() {
+                client_info
+                    .tx
+                    .send_replace(Some(self.get_client_notification(client_id, room)));
+            }
         }
-    }
-
-    fn get_new_client_id(&mut self) -> ClientId {
-        self.next_client_id += 1;
-        ClientId(self.next_client_id - 1)
     }
 }
 
@@ -104,16 +136,7 @@ pub async fn start_vote(
         .filter(|choice| !choice.is_empty())
         .map(|choice| choice.to_owned())
         .collect();
-    let room_id = RoomId::new_random();
-    state.lock().await.rooms.insert(
-        room_id.clone(),
-        Room {
-            choices,
-            votes: HashMap::new(),
-            clients: HashMap::new(),
-            results: None,
-        },
-    );
+    let room_id = state.lock().await.create_room(choices).await;
     let uri = Uri::builder()
         .path_and_query(format!("/vote/{room_id}"))
         .build()
@@ -123,18 +146,31 @@ pub async fn start_vote(
 
 pub async fn handle_vote_client(
     global_state: Arc<Mutex<VoteState>>,
+    params: VoteWebsocketQueryParams,
     room_id: String,
     mut ws: WebSocket,
 ) {
     let room_id = RoomId(room_id);
-    let client_id;
     let (tx, mut rx) = watch::channel(None);
+    let client_id = ClientId(match Uuid::parse_str(&params.id) {
+        Ok(uuid) => uuid,
+        Err(err) => {
+            log::debug!("Failed to parse client UUID: {:?}: {:?}", params.id, err);
+            ws.feed(Message::text(
+                serde_json::to_string(&api::ClientNotification {
+                    status: api::ClientStatus::InvalidUuid,
+                    vote: None,
+                })
+                .unwrap(),
+            ))
+            .await
+            .ok();
+            return;
+        }
+    });
     {
         let mut gs = global_state.lock().await;
-        client_id = gs.get_new_client_id();
-        let room = if let Some(room) = gs.rooms.get_mut(&room_id) {
-            room
-        } else {
+        if !gs.register_client(&room_id, client_id, tx).await {
             log::debug!("client {client_id:?} gave invalid room {room_id}");
             ws.feed(Message::text(
                 serde_json::to_string(&api::ClientNotification {
@@ -146,10 +182,7 @@ pub async fn handle_vote_client(
             .await
             .ok();
             return;
-        };
-        // Note: this notification is immediately clobbered by broadcast_state().
-        room.clients.insert(client_id, ClientInfo { tx });
-        gs.broadcast_state(&room_id).await;
+        }
     };
     log::debug!("client {client_id:?} connected to room {room_id}");
     let on_command = |global_state: Arc<Mutex<VoteState>>, room_id, client_id, command| async move {
@@ -258,7 +291,13 @@ pub async fn handle_vote_client(
         // cleanup
         let mut gs = global_state.lock().await;
         let room = gs.rooms.get_mut(&room_id).unwrap();
-        room.clients.remove(&client_id);
+        let client_connections = room.clients.get_mut(&client_id).unwrap();
+        drop(rx);
+        client_connections.retain(|conn| !conn.tx.is_closed());
+        log::debug!("{} connections left", client_connections.len());
+        if client_connections.is_empty() {
+            room.clients.remove(&client_id);
+        }
         if room.clients.is_empty() {
             gs.rooms.remove(&room_id);
         } else {

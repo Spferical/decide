@@ -1,5 +1,6 @@
 import { Component, createRef, Fragment, render } from 'preact';
 import { route, Router } from 'preact-router';
+import Cookies from 'js-cookie';
 
 function Index() {
     function rps() {
@@ -15,6 +16,16 @@ function Index() {
             <h2><a href="javascript:void(0)" onClick={rps}>Rock Paper Scissors</a></h2>
         </main>
     )
+}
+
+function get_vote_uuid() {
+    let cookie = Cookies.get("VOTE_ID");
+    if (cookie) {
+        return cookie;
+    }
+    let uuid = crypto.randomUUID();
+    Cookies.set("VOTE_ID", uuid);
+    return uuid;
 }
 
 function make_websocket(path) {
@@ -254,12 +265,12 @@ class Vote extends Component {
     render(props, state) {
         if (state.room != props.room) {
             state.room = props.room;
-            this.ws = make_websocket(`/api/vote/${state.room}`);
-            this.ws.onclose = function(evt) {
+            this.ws = make_websocket(`/api/vote/${state.room}?id=${get_vote_uuid()}`);
+            this.ws.onclose = evt => {
                 console.log("Websocket disconnected!");
                 console.log(evt);
                 this.setState({ status: "disconnected" });
-            }.bind(this);
+            };
             this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
         }
         console.log(state);

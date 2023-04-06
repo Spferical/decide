@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use decide_api::VoteWebsocketQueryParams;
 use tokio::sync::Mutex;
 use warp::{Filter, Rejection};
 
@@ -44,11 +45,16 @@ async fn main() {
             WebResult::Ok(ws.on_upgrade(|ws| rps::handle_rps_client(rooms, room_id, ws)))
         });
     let vote_route = warp::path!("api" / "vote" / String)
+        .and(warp::query::query())
         .and(warp::ws())
         .and(with_vote_state)
-        .and_then(|room_id, ws: warp::ws::Ws, state| async move {
-            WebResult::Ok(ws.on_upgrade(|ws| vote::handle_vote_client(state, room_id, ws)))
-        });
+        .and_then(
+            |room_id, params: VoteWebsocketQueryParams, ws: warp::ws::Ws, state| async move {
+                WebResult::Ok(
+                    ws.on_upgrade(|ws| vote::handle_vote_client(state, params, room_id, ws)),
+                )
+            },
+        );
     let routes = new_vote_route
         .or(vote_route)
         .or(rps_route)
