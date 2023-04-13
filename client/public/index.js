@@ -53,7 +53,6 @@ class Rps extends Component {
     }
 
     render(_props, state) {
-        console.log(state);
         if (state.status == "connecting") {
             return <footer>Connecting...</footer>
         } else if (state.status == "disconnected") {
@@ -143,15 +142,14 @@ function shuffle_array(array) {
 class Choices extends Component {
     constructor(props) {
         super();
-        let order = Array(props.choices.length).fill().map((_, i) => i);
-        shuffle_array(order);
         this.state = {
             // Mapping of sorted position -> choice index.
-            order,
+            order: Array(props.choices.length).fill().map((_, i) => i),
             // true if sorted choice i is > choice i+1, else false if equal.
-            gt: Array(props.choices.length).fill(true),
+            gt: Array(props.choices.length - 1).fill(true),
             selected: null,
         };
+        this.set_selections(props.initial_ranks);
     }
 
     swap(i, j) {
@@ -206,6 +204,32 @@ class Choices extends Component {
         }
         return <div>{choices}</div>;
     }
+
+    get_selections() {
+        let items = [];
+        let rank = 0;
+        for (let i = 0; i < this.state.order.length; i++) {
+            let item = this.state.order[i];
+            items.push({ candidate: item, rank });
+            if (this.state.gt[i]) {
+                rank++;
+            }
+        }
+        return items;
+    }
+
+    set_selections(items) {
+        if (items.length == 0) {
+            return;
+        }
+        items.sort((a, b) => a.rank - b.rank);
+        let choices = items.map(item => item.candidate);
+        let gt = [];
+        for (let i = 1; i < items.length; i++) {
+            gt.push(items[i].rank > items[i - 1].rank);
+        }
+        this.setState({ order: choices, gt: gt })
+    }
 }
 
 function VoteResults({ choices, results }) {
@@ -254,27 +278,17 @@ function VoteResults({ choices, results }) {
 }
 
 class Vote extends Component {
-    state = { room: null, status: "connecting", voter_name: "???" };
+    state = { room: null, status: "connecting", voter_name: "" };
     ws = null;
     choices_component = createRef();
+    initial_vote = null;
 
     componentDidMount() {
         document.title = "Vote";
     }
 
     render(props, state) {
-        if (state.room != props.room) {
-            state.room = props.room;
-            this.ws = make_websocket(`/api/vote/${state.room}?id=${get_vote_uuid()}`);
-            this.ws.onclose = evt => {
-                console.log("Websocket disconnected!");
-                console.log(evt);
-                this.setState({ status: "disconnected" });
-            };
-            this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
-        }
-        console.log(state);
-        if (!state.room) {
+        if (!props.room) {
             return <Fragment>
                 <h2>Condorcet Voting (Ranked Pairs)</h2>
                 <p><a href="https://en.wikipedia.org/wiki/Condorcet_method">What is Condorcet Voting?</a></p>
@@ -284,7 +298,23 @@ class Vote extends Component {
                     <input type="submit" value="Start Vote" />
                 </form>
             </Fragment>
-        } else if (state.status == "connecting") {
+        }
+
+        if (state.room != props.room) {
+            // The client connected to a new room. Perform initial setup.
+            state.room = props.room;
+            this.ws = make_websocket(`/api/vote/${state.room}?id=${get_vote_uuid()}`);
+            this.ws.onclose = evt => {
+                console.log("Websocket disconnected!");
+                console.log(evt);
+                this.setState({ status: "disconnected" });
+            };
+            this.ws.onmessage = msg => {
+                let new_state = JSON.parse(msg.data);
+                this.setState(new_state)
+            };
+        }
+        if (state.status == "connecting") {
             return <footer>Connecting...</footer>
         } else if (state.status == "disconnected") {
             return <footer>Disconnected! Try refreshing.</footer>
@@ -292,6 +322,8 @@ class Vote extends Component {
             route("/vote");
             return <footer>Invalid room!</footer>
         }
+
+        console.assert(state.vote != null);
 
         const on_input = event => this.setState({ voter_name: event.target.value });
 
@@ -303,15 +335,7 @@ class Vote extends Component {
 
         const submit = () => {
             const choices_component = this.choices_component.current;
-            let items = [];
-            let rank = 0;
-            for (let i = 0; i < state.vote.choices.length; i++) {
-                let item = choices_component.state.order[i];
-                items.push({ candidate: item, rank });
-                if (choices_component.state.gt[i]) {
-                    rank++;
-                }
-            }
+            let items = choices_component.get_selections();
             this.ws.send(JSON.stringify({ vote: { name: this.state.voter_name, selections: items } }))
         };
 
@@ -324,10 +348,33 @@ class Vote extends Component {
 
         const submit_text = (state.vote.your_vote) ? "Resubmit Your Vote" : "Submit Your Vote";
 
+        // initial_vote is false until the first render with server-provided room state.
+        if (!this.initial_vote) {
+            // If this is a new tab from an existing user, adjust the UI
+            // to match the last submitted vote.
+            let vote = state.vote.your_vote;
+            if (vote) {
+                this.initial_vote = vote;
+                this.setState({ voter_name: this.initial_vote.name })
+            } else {
+                let initial_order = Array(state.vote.choices.length).fill().map((_, i) => i);
+                shuffle_array(initial_order);
+                let initial_selections =
+                    initial_order.map(
+                        (candidate_idx, i) => ({ candidate: candidate_idx, rank: i }),
+                    );
+                this.initial_vote = {
+                    name: "???",
+                    selections: initial_selections
+                }
+                this.setState({ voter_name: this.initial_vote.name })
+            }
+        }
+
         const ballot_section = (
             <Fragment>
                 <p>Click or drag to edit your ballot.</p>
-                <Choices ref={this.choices_component} choices={state.vote.choices} />
+                <Choices ref={this.choices_component} choices={state.vote.choices} initial_ranks={this.initial_vote.selections} />
                 <p>
                     <label for="voter_name">Voter name (optional):</label>
                     <input value={state.voter_name} onInput={on_input} />
