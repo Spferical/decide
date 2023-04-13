@@ -2,7 +2,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::{mpsc, Mutex};
-use warp::ws::{Message, WebSocket};
+use warp::{
+    ws::{Message, WebSocket},
+    Filter,
+};
+
+use crate::WebResult;
 
 /// Each websocket connection is a unique player.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -104,7 +109,7 @@ enum Command {
     Choice(Choice),
 }
 
-pub struct RpsState {
+struct RpsState {
     rooms: HashMap<RoomId, Room>,
     next_client_id: u64,
 }
@@ -206,11 +211,7 @@ impl RpsState {
     }
 }
 
-pub async fn handle_rps_client(
-    global_state: Arc<Mutex<RpsState>>,
-    room_id: String,
-    mut ws: WebSocket,
-) {
+async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, mut ws: WebSocket) {
     let (tx, mut rx) = mpsc::channel(1);
     let room_id = RoomId(room_id);
     let client_id;
@@ -320,4 +321,17 @@ pub async fn handle_rps_client(
             gs.broadcast_state(&room_id).await;
         }
     }
+}
+
+#[allow(opaque_hidden_inferred_bound)]
+pub fn routes() -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    let rps_state = Arc::new(Mutex::new(RpsState::new()));
+    let with_rps_state = warp::any().map(move || rps_state.clone());
+    let rps_route = warp::path!("api" / "rps" / String)
+        .and(warp::ws())
+        .and(with_rps_state)
+        .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
+            WebResult::Ok(ws.on_upgrade(|ws| handle_rps_client(rooms, room_id, ws)))
+        });
+    rps_route
 }

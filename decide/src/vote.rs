@@ -8,7 +8,7 @@ use uuid::Uuid;
 use warp::{
     hyper::Uri,
     ws::{Message, WebSocket},
-    Reply,
+    Filter, Reply,
 };
 
 use decide_api as api;
@@ -49,12 +49,12 @@ struct ConnectionHandle {
     tx: watch::Sender<Option<api::ClientNotification>>,
 }
 
-pub struct VoteState {
+struct VoteState {
     rooms: HashMap<RoomId, Room>,
 }
 
 impl VoteState {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             rooms: HashMap::new(),
         }
@@ -125,10 +125,7 @@ impl VoteState {
     }
 }
 
-pub async fn start_vote(
-    state: Arc<Mutex<VoteState>>,
-    form: api::NewVoteForm,
-) -> WebResult<impl Reply> {
+async fn start_vote(state: Arc<Mutex<VoteState>>, form: api::NewVoteForm) -> WebResult<impl Reply> {
     let choices = form
         .choices
         .split('\n')
@@ -144,7 +141,7 @@ pub async fn start_vote(
     Ok(warp::redirect::see_other(uri))
 }
 
-pub async fn handle_vote_client(
+async fn handle_vote_client(
     global_state: Arc<Mutex<VoteState>>,
     params: VoteWebsocketQueryParams,
     room_id: String,
@@ -305,4 +302,26 @@ pub async fn handle_vote_client(
         }
         log::debug!("client {client_id:?} disconnected.");
     }
+}
+
+#[allow(opaque_hidden_inferred_bound)]
+pub fn routes() -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    let vote_state = Arc::new(Mutex::new(VoteState::new()));
+    let with_vote_state = warp::any().map(move || vote_state.clone());
+    let new_vote_route = warp::path!("api" / "start_vote")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(1024 * 32))
+        .and(with_vote_state.clone())
+        .and(warp::body::form())
+        .and_then(start_vote);
+    let vote_route = warp::path!("api" / "vote" / String)
+        .and(warp::query::query())
+        .and(warp::ws())
+        .and(with_vote_state)
+        .and_then(
+            |room_id, params: VoteWebsocketQueryParams, ws: warp::ws::Ws, state| async move {
+                WebResult::Ok(ws.on_upgrade(|ws| handle_vote_client(state, params, room_id, ws)))
+            },
+        );
+    new_vote_route.or(vote_route)
 }
