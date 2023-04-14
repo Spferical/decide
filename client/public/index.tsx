@@ -24,7 +24,7 @@ function get_vote_uuid() {
         return cookie;
     }
     let uuid = crypto.randomUUID();
-    Cookies.set("VOTE_ID", uuid);
+    Cookies.set("VOTE_ID", uuid, { sameSite: "strict" });
     return uuid;
 }
 
