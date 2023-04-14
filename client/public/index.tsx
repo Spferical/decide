@@ -1,4 +1,4 @@
-import { Component, createRef, Fragment, render } from 'preact';
+import { Component, createRef, Fragment, render, VNode } from 'preact';
 import { route, Router } from 'preact-router';
 import Cookies from 'js-cookie';
 
@@ -28,18 +28,50 @@ function get_vote_uuid() {
     return uuid;
 }
 
-function make_websocket(path) {
+function make_websocket(path: string) {
     const ws_protocol = (window.location.protocol == "https:") ? "wss://" : "ws://";
     const uri = ws_protocol + location.host + path;
     return new WebSocket(uri);
 }
 
-class Rps extends Component {
-    state = { status: "connecting" };
+type RpsProps = {
+    room: string
+}
+
+type PlayerView = {
+    choice: string | null,
+    opponent_chosen: boolean
+    outcome_history: string[]
+    wins: number
+    draws: number
+    losses: number
+}
+
+type SpectatorView = {
+    player_wins: number[]
+    player_chosen: boolean[]
+    draws: number
+}
+
+type RoomView = {
+    num_players: number
+    num_spectators: number
+    history: string[][]
+    player_view: PlayerView | null
+    spectator_view: SpectatorView | null
+}
+
+type RpsState = {
+    status: string,
+    room_state: RoomView | null
+}
+
+class Rps extends Component<RpsProps, RpsState> {
+    state = { status: "connecting", room_state: null };
     ws = null;
     room = null;
 
-    constructor(props) {
+    constructor(props: RpsProps) {
         super();
         this.room = props.room;
     }
@@ -52,21 +84,21 @@ class Rps extends Component {
         this.ws = ws;
     }
 
-    render(_props, state) {
+    render(_props: RpsProps, state: RpsState) {
         if (state.status == "connecting") {
-            return <footer>Connecting...</footer>
+            return <footer>Connecting...</footer>;
         } else if (state.status == "disconnected") {
-            return <footer>Disconnected! Try refreshing.</footer>
+            return <footer>Disconnected! Try refreshing.</footer>;
         }
         let player_view = state.room_state.player_view;
         let spectator_view = state.room_state.spectator_view;
         const is_player = !!player_view;
-        const get_onclick = choice => () => {
+        const get_onclick = (choice: string) => () => {
             this.ws.send(JSON.stringify({ choice }))
         };
 
         let history = state.room_state.history;
-        let history_component;
+        let history_component: VNode;
         if (history.length > 0) {
             let items = [];
             for (let i = 0; i < history.length; i++) {
@@ -116,7 +148,7 @@ class Rps extends Component {
     }
 }
 
-function describe_vote(choices, vote) {
+function describe_vote(choices: string[], vote: UserVote) {
     let s = `${vote.name}: `;
     for (let j = 0; j < vote.selections.length; j++) {
         let vi = vote.selections[j];
@@ -132,19 +164,35 @@ function describe_vote(choices, vote) {
     return s;
 }
 
-function shuffle_array(array) {
-    for (let i = array.length - 1; i > 0; i--) {
+function shuffle_array(arr: any[]) {
+    for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        [arr[i], arr[j]] = [arr[j], arr[i]];
     }
 }
 
-class Choices extends Component {
-    constructor(props) {
+type VoteItem = {
+    candidate: number,
+    rank: number,
+}
+
+type ChoicesProps = {
+    choices: string[],
+    initial_ranks: VoteItem[],
+};
+
+type ChoicesState = {
+    order: number[],
+    gt: boolean[],
+    selected: number | null,
+};
+
+class Choices extends Component<ChoicesProps, ChoicesState> {
+    constructor(props: ChoicesProps) {
         super();
         this.state = {
             // Mapping of sorted position -> choice index.
-            order: Array(props.choices.length).fill().map((_, i) => i),
+            order: Array(props.choices.length).fill(null).map((_, i) => i),
             // true if sorted choice i is > choice i+1, else false if equal.
             gt: Array(props.choices.length - 1).fill(true),
             selected: null,
@@ -152,7 +200,7 @@ class Choices extends Component {
         this.set_selections(props.initial_ranks);
     }
 
-    swap(i, j) {
+    swap(i: number, j: number) {
         let order = this.state.order.slice();
         let tmp = order[j];
         order[j] = order[i];
@@ -160,7 +208,7 @@ class Choices extends Component {
         return { order }
     }
 
-    onChoiceClick(i) {
+    onChoiceClick(i: number) {
         if (this.state.selected == null) {
             this.setState({ selected: i });
         } else {
@@ -168,30 +216,30 @@ class Choices extends Component {
         }
     }
 
-    onRankClick(i) {
+    onRankClick(i: number) {
         let gt = this.state.gt.slice();
         gt[i] = !gt[i];
         this.setState({ gt });
     }
 
-    onDragStart(i) {
+    onDragStart(i: number) {
         this.setState({ selected: i });
     }
 
-    onDragEnter(i) {
+    onDragEnter(i: number) {
         console.assert(this.state.selected != null);
         this.setState({ ...this.swap(i, this.state.selected), selected: i });
     }
 
-    render(props, state) {
+    render(props: ChoicesProps, state: ChoicesState) {
         let choices = [];
         for (let i = 0; i < props.choices.length; i++) {
-            let choice = props.choices[state.order[i]];
+            const choice_str = props.choices[state.order[i]];
             const choice_onclick = () => this.onChoiceClick(i);
             const choice_class = this.state.selected == i ? "choice chosen" : "choice";
             const ondragstart = () => this.onDragStart(i);
             const ondragenter = () => this.onDragEnter(i);
-            choice = <span role="button" class={choice_class} draggable={true} onClick={choice_onclick} onDragStart={ondragstart} onDragEnter={ondragenter}>{choice}</span>;
+            const choice = <span role="button" class={choice_class} draggable={true} onClick={choice_onclick} onDragStart={ondragstart} onDragEnter={ondragenter}>{choice_str}</span>;
             choices.push(choice);
             if (i + 1 != props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
@@ -218,7 +266,7 @@ class Choices extends Component {
         return items;
     }
 
-    set_selections(items) {
+    set_selections(items: VoteItem[]) {
         if (items.length == 0) {
             return;
         }
@@ -232,7 +280,22 @@ class Choices extends Component {
     }
 }
 
-function VoteResults({ choices, results }) {
+type UserVote = {
+    selections: VoteItem[],
+    name: string,
+}
+
+type Tally = {
+    totals: number[][],
+    ranks: number[][],
+}
+
+type Results = {
+    votes: UserVote[]
+    tally: Tally,
+}
+
+function VoteResults({ choices, results }: { choices: string[], results: Results }) {
     // NOTE: no JSX keys here, vote results are static at the moment.
     /* eslint-disable-next-line react/jsx-key */
     const votes = results.votes.map(v => <li>{describe_vote(choices, v)}</li>);
@@ -277,17 +340,36 @@ function VoteResults({ choices, results }) {
 
 }
 
-class Vote extends Component {
-    state = { room: null, status: "connecting", voter_name: "" };
-    ws = null;
+type VoteProps = {
+    room: string
+}
+
+type VoteView = {
+    choices: string[]
+    your_vote: UserVote | null
+    num_votes: number
+    num_players: number
+    results: Results | null
+}
+
+type VoteState = {
+    room: string | null
+    status: string
+    voter_name: string
+    vote: VoteView | null
+}
+
+class Vote extends Component<VoteProps, VoteState> {
+    state = { room: null, status: "connecting", voter_name: "", vote: null };
+    ws: WebSocket | null = null;
     choices_component = createRef();
-    initial_vote = null;
+    initial_vote: UserVote | null = null;
 
     componentDidMount() {
         document.title = "Vote";
     }
 
-    render(props, state) {
+    render(props: VoteProps, state: VoteState) {
         if (!props.room) {
             return <Fragment>
                 <h2>Condorcet Voting (Ranked Pairs)</h2>
@@ -325,7 +407,9 @@ class Vote extends Component {
 
         console.assert(state.vote != null);
 
-        const on_input = event => this.setState({ voter_name: event.target.value });
+        const on_input = (event: Event) => this.setState(
+            { voter_name: (event.target as HTMLInputElement).value }
+        );
 
         let submitted_section = null;
         if (state.vote.your_vote) {
@@ -357,7 +441,7 @@ class Vote extends Component {
                 this.initial_vote = vote;
                 this.setState({ voter_name: this.initial_vote.name })
             } else {
-                let initial_order = Array(state.vote.choices.length).fill().map((_, i) => i);
+                let initial_order = Array(state.vote.choices.length).fill(null).map((_, i) => i);
                 shuffle_array(initial_order);
                 let initial_selections =
                     initial_order.map(
@@ -406,7 +490,9 @@ export default function App() {
     return (
         <Router>
             <Index path="/" />
+            {/* @ts-ignore */}
             <Rps path="/rps/:room?" />
+            {/* @ts-ignore */}
             <Vote path="/vote/:room?" />
         </Router>
     );
