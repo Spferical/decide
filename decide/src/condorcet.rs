@@ -179,7 +179,11 @@ mod test {
         assert_eq!(is_reachable(3, 6, complicated_graph), true);
     }
 
+    // tt-munching macro to define example ballots.
+    // syntax looks like:
+    //     ballot!(0 > 1 = 2)
     macro_rules! ballot {
+        // Parse usize representing a candidate, adding them to the ballot.
         (@inner $bal:ident $rank:ident $candidate:literal $($tt:tt)*) => {
             $bal.push(VoteItem {
                 candidate: $candidate,
@@ -187,21 +191,20 @@ mod test {
             });
             ballot!(@inner $bal $rank $($tt)*)
         };
-        (@inner $bal:ident $rank:ident $candidate:literal) => {
-            $bal.append(VoteItem {
-                candidate: $candidate,
-                rank: $rank,
-            });
-        };
+        // Parse `>`. Increase the rank of following candidates.
         (@inner $bal:ident $rank:ident > $($tt:tt)*) => {
             $rank += 1;
             ballot!(@inner $bal $rank $($tt)*)
         };
+        // Parse `=`. No-op.
         (@inner $bal:ident $rank:ident = $($tt:tt)*) => {
             ballot!(@inner $bal $rank $($tt)*)
         };
+        // Base case: out of tokens.
         (@inner $bal:ident $rank:ident) => {};
+        // Invalid input.
         (@inner $($tt:tt)*) => {panic!(stringify!($($tt)*))};
+        // Top-level invocation: create a ballot.
         ($($tt:tt)*) => {{
             #[allow(unused_mut)]
             let mut bal = Vec::new();
@@ -212,6 +215,7 @@ mod test {
         }}
     }
 
+    // Macro to define a list of ballots.
     macro_rules! ballots {
         ($(($num:literal : $($tt:tt)*))*) => {{
             #[allow(unused_mut)]
