@@ -1,4 +1,9 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use api::VoteWebsocketQueryParams;
 use futures_util::{SinkExt, StreamExt};
@@ -14,6 +19,11 @@ use warp::{
 use decide_api as api;
 
 use crate::{condorcet::ranked_pairs, WebResult};
+
+/// Time after which a room will be deleted if it has no activity.
+const ROOM_EXPIRY: std::time::Duration = std::time::Duration::from_secs(60 * 60 * 24);
+/// Interval at which inactive rooms are deleted.
+const CLEANUP_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
 /// Each websocket connection is a unique player.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -34,13 +44,14 @@ impl std::fmt::Display for RoomId {
     }
 }
 
-#[derive(Default)]
 struct Room {
     // Each client may have multiple tabs open.
     clients: HashMap<ClientId, Vec<ConnectionHandle>>,
     choices: Vec<String>,
     votes: HashMap<ClientId, api::UserVote>,
     results: Option<api::CondorcetTally>,
+    // Timestamp of last room activity.
+    last_active: Instant,
 }
 
 /// Handle to the async task managing one client's websocket connection.
@@ -69,6 +80,7 @@ impl VoteState {
                 votes: HashMap::new(),
                 clients: HashMap::new(),
                 results: None,
+                last_active: Instant::now(),
             },
         );
         room_id
@@ -86,10 +98,23 @@ impl VoteState {
                 .entry(client_id)
                 .or_default()
                 .push(ConnectionHandle { tx });
+            room.last_active = Instant::now();
             self.broadcast_state(&room_id).await;
             true
         } else {
             false
+        }
+    }
+
+    /// Add a submitted vote to a room. Does nothing if the room does not exist or the results
+    /// are already tallied.
+    async fn submit_vote(&mut self, room_id: &RoomId, client_id: ClientId, vote: api::UserVote) {
+        if let Some(room) = self.rooms.get_mut(room_id) {
+            if room.results.is_none() {
+                room.votes.insert(client_id, vote);
+                room.last_active = Instant::now();
+                self.broadcast_state(&room_id).await;
+            }
         }
     }
 
@@ -122,6 +147,23 @@ impl VoteState {
                     .send_replace(Some(self.get_client_notification(client_id, room)));
             }
         }
+    }
+
+    async fn cleanup_rooms(&mut self) {
+        let now = Instant::now();
+        self.rooms.retain(|room_id, room| {
+            if !room.clients.is_empty() {
+                room.last_active = Instant::now();
+                true
+            } else {
+                let elapsed = now - room.last_active;
+                let keep = elapsed < ROOM_EXPIRY || !room.clients.is_empty();
+                if !keep {
+                    log::info!("Deleting room {}", room_id.0);
+                }
+                keep
+            }
+        });
     }
 }
 
@@ -187,11 +229,7 @@ async fn handle_vote_client(
         match command {
             api::Command::Vote(user_vote) => {
                 let mut gs = global_state.lock().await;
-                let room = gs.rooms.get_mut(&room_id).unwrap();
-                if room.results.is_none() {
-                    room.votes.insert(client_id, user_vote);
-                    gs.broadcast_state(&room_id).await;
-                }
+                gs.submit_vote(&room_id, client_id, user_vote).await;
             }
             api::Command::Tally => {
                 let mut gs = global_state.lock().await;
@@ -295,18 +333,24 @@ async fn handle_vote_client(
         if client_connections.is_empty() {
             room.clients.remove(&client_id);
         }
-        if room.clients.is_empty() {
-            gs.rooms.remove(&room_id);
-        } else {
-            gs.broadcast_state(&room_id).await;
-        }
+        gs.broadcast_state(&room_id).await;
         log::debug!("client {client_id:?} disconnected.");
+    }
+}
+
+// Background task that cleans up old rooms.
+async fn cleanup_task(global_state: Arc<Mutex<VoteState>>) {
+    loop {
+        tokio::time::sleep(CLEANUP_INTERVAL).await;
+        let mut gs = global_state.lock().await;
+        gs.cleanup_rooms().await;
     }
 }
 
 #[allow(opaque_hidden_inferred_bound)]
 pub fn routes() -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     let vote_state = Arc::new(Mutex::new(VoteState::new()));
+    tokio::spawn(cleanup_task(vote_state.clone()));
     let with_vote_state = warp::any().map(move || vote_state.clone());
     let new_vote_route = warp::path!("api" / "start_vote")
         .and(warp::post())

@@ -478,7 +478,7 @@ class Vote extends Component<VoteProps, VoteState> {
                     {results}
                 </main>
                 <footer>
-                    <p>The election will be deleted when everyone leaves.</p>
+                    <p>This election will be <strong>deleted</strong> after 24 hours of inactivity.</p>
                     <p><a href="/vote">Click here to create a new election.</a></p>
                 </footer>
             </Fragment>
