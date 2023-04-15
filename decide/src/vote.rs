@@ -139,12 +139,13 @@ impl VoteState {
     }
 
     async fn broadcast_state(&self, room_id: &RoomId) {
-        let room = self.rooms.get(room_id).unwrap();
-        for (client_id, client_infos) in room.clients.iter() {
-            for client_info in client_infos.iter() {
-                client_info
-                    .tx
-                    .send_replace(Some(self.get_client_notification(client_id, room)));
+        if let Some(room) = self.rooms.get(room_id) {
+            for (client_id, client_infos) in room.clients.iter() {
+                for client_info in client_infos.iter() {
+                    client_info
+                        .tx
+                        .send_replace(Some(self.get_client_notification(client_id, room)));
+                }
             }
         }
     }
@@ -233,7 +234,11 @@ async fn handle_vote_client(
             }
             api::Command::Tally => {
                 let mut gs = global_state.lock().await;
-                let room = gs.rooms.get_mut(&room_id).unwrap();
+                let room = match gs.rooms.get_mut(&room_id) {
+                    Some(room) => room,
+                    // Room's closing.
+                    None => return,
+                };
                 if room.results.is_some() {
                     // No need to recalculate.
                     return;
@@ -269,7 +274,8 @@ async fn handle_vote_client(
                 Ok(()) => {
                     let serialized_msg = {
                         let borrowed_msg = rx.borrow_and_update();
-                        serde_json::to_string(borrowed_msg.as_ref().unwrap()).unwrap()
+                        let msg_ref = borrowed_msg.as_ref().expect("Got None client broadcast");
+                        serde_json::to_string(msg_ref).unwrap()
                     };
                     log::debug!("Sending message: {:?}", serialized_msg);
                     if let Err(err) = ws.send(Message::text(serialized_msg)).await {
@@ -325,13 +331,15 @@ async fn handle_vote_client(
     {
         // cleanup
         let mut gs = global_state.lock().await;
-        let room = gs.rooms.get_mut(&room_id).unwrap();
-        let client_connections = room.clients.get_mut(&client_id).unwrap();
         drop(rx);
-        client_connections.retain(|conn| !conn.tx.is_closed());
-        log::debug!("{} connections left", client_connections.len());
-        if client_connections.is_empty() {
-            room.clients.remove(&client_id);
+        if let Some(room) = gs.rooms.get_mut(&room_id) {
+            if let Some(client_connections) = room.clients.get_mut(&client_id) {
+                client_connections.retain(|conn| !conn.tx.is_closed());
+                log::debug!("{} connections left", client_connections.len());
+                if client_connections.is_empty() {
+                    room.clients.remove(&client_id);
+                }
+            }
         }
         gs.broadcast_state(&room_id).await;
         log::debug!("client {client_id:?} disconnected.");
