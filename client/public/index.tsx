@@ -1,10 +1,11 @@
 import { Component, createRef, Fragment, render, VNode } from 'preact';
 import { route, Router } from 'preact-router';
 import Cookies from 'js-cookie';
+import { v4 as uuidv4 } from 'uuid';
 
 function Index() {
     function rps() {
-        const room = crypto.randomUUID().substring(0, 5);
+        const room = uuidv4().substring(0, 5);
         route(`/rps/${room}`);
     }
     function vote() {
@@ -23,7 +24,7 @@ function get_vote_uuid() {
     if (cookie) {
         return cookie;
     }
-    let uuid = crypto.randomUUID();
+    let uuid = uuidv4();
     Cookies.set("VOTE_ID", uuid, { sameSite: "strict" });
     return uuid;
 }
