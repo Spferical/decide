@@ -18,13 +18,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err("Pass in server url as first argument.".into());
         }
     };
+    let db_url = match std::env::args().nth(2) {
+        Some(addr) => addr,
+        None => {
+            return Err("Pass in database url as second argument.".into());
+        }
+    };
     let addr = match addr.parse::<SocketAddr>() {
         Ok(addr) => addr,
         Err(e) => {
             return Err(format!("Invalid URL: {}: {}", addr, e).into());
         }
     };
-    let routes = vote::routes()
+    let routes = vote::routes(&db_url)
         .await
         .or(rps::routes())
         .or(warp::fs::dir("static"))

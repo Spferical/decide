@@ -1,5 +1,6 @@
-from rust:1.67 as builder
+from rust:1.69-slim-buster as builder
 
+run apt update && apt install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 # cache dependencies by building project without source code
 run cargo new --bin decide
 run cargo new --lib api
@@ -29,13 +30,18 @@ run npm run build
 FROM debian:buster-slim
 env DEBIAN_FRONTEND=noninteractive
 run apt update && apt install -y dumb-init && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/local/cargo/bin/decide /usr/local/bin/decide
-COPY --from=clientbuilder app/dist static
 
 run groupadd decide && useradd -g decide decide
-user decide
+workdir /app
+run mkdir /app/data
+run chown -R decide:decide /app/data
+run chmod 755 /app/data
 
+COPY --from=builder /usr/local/cargo/bin/decide /usr/local/bin/decide
+COPY --from=clientbuilder app/dist /app/static
+
+user decide
 expose 8000
 
 entrypoint ["/usr/bin/dumb-init", "--"]
-cmd ["/usr/local/bin/decide", "0.0.0.0:8000"]
+cmd ["/usr/local/bin/decide", "0.0.0.0:8000", "sqlite:///app/data/decide.sqlite"]

@@ -64,8 +64,7 @@ pub(crate) struct Db {
 }
 
 impl Db {
-    pub async fn init() -> Result<Self, Box<dyn std::error::Error>> {
-        let db_url = "sqlite://decide.sqlite";
+    pub async fn init(db_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let connection_options = SqliteConnectOptions::from_str(db_url)?
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Wal)

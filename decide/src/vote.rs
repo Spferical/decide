@@ -165,8 +165,8 @@ fn calculate_room_tally(
 }
 
 impl VoteState {
-    async fn init() -> Result<Self, Box<dyn std::error::Error>> {
-        let db = Db::init().await?;
+    async fn init(db_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let db = Db::init(db_url).await?;
         Ok(Self {
             rooms: HashMap::new(),
             db,
@@ -394,8 +394,9 @@ async fn run_cleanup_task(global_state: Arc<Mutex<VoteState>>) {
 
 #[allow(opaque_hidden_inferred_bound)]
 pub async fn routes(
+    db_url: &str,
 ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let vote_state = Arc::new(Mutex::new(VoteState::init().await.unwrap()));
+    let vote_state = Arc::new(Mutex::new(VoteState::init(db_url).await.unwrap()));
     tokio::spawn(run_cleanup_task(vote_state.clone()));
     let with_vote_state = warp::any().map(move || vote_state.clone());
     let new_vote_route = warp::path!("api" / "start_vote")
