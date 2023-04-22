@@ -216,7 +216,10 @@ impl VoteState {
         if let Some(room) = self.rooms.get_mut(room_id) {
             if let Some(client_connections) = room.clients.get_mut(&client_id) {
                 client_connections.retain(|conn| !conn.tx.is_closed());
-                log::debug!("{} connections left", client_connections.len());
+                log::debug!(
+                    "Room {room_id} has {} connections left",
+                    client_connections.len()
+                );
                 if client_connections.is_empty() {
                     room.clients.remove(&client_id);
                 }
@@ -237,10 +240,12 @@ impl VoteState {
     }
 
     async fn cleanup_rooms(&mut self) {
+        let start = Instant::now();
         for room_id in self.rooms.keys() {
             self.db.bump_room_activity(room_id).await;
         }
         self.db.cleanup_rooms().await;
+        log::info!("Cleaned rooms in {:?}", Instant::now() - start);
     }
 }
 
@@ -287,7 +292,7 @@ async fn handle_vote_client(
     {
         let mut gs = global_state.lock().await;
         if !gs.register_client(&room_id, client_id, tx).await {
-            log::debug!("client {client_id:?} gave invalid room {room_id}");
+            log::debug!("client {client_id} gave invalid room {room_id}");
             ws.feed(Message::text(
                 serde_json::to_string(&api::ClientNotification {
                     status: api::ClientStatus::InvalidRoom,
@@ -300,9 +305,9 @@ async fn handle_vote_client(
             return;
         }
     };
-    log::debug!("client {client_id:?} connected to room {room_id}");
+    log::debug!("client {client_id} connected to room {room_id}");
     let on_command = |global_state: Arc<Mutex<VoteState>>, room_id, client_id, command| async move {
-        log::debug!("Got command: {:?}", command);
+        log::debug!("client {client_id} sent command: {:?}", command);
         match command {
             api::Command::Vote(user_vote) => {
                 let mut gs = global_state.lock().await;
@@ -320,7 +325,7 @@ async fn handle_vote_client(
                 Ok(()) => {
                     let serialized_msg = {
                         let borrowed_msg = rx.borrow_and_update();
-                        let msg_ref = borrowed_msg.as_ref().expect("Got None client broadcast");
+                        let msg_ref = borrowed_msg.as_ref().expect("Bad state broadcast");
                         serde_json::to_string(msg_ref).unwrap()
                     };
                     log::debug!("Sending message: {:?}", serialized_msg);
@@ -355,7 +360,7 @@ async fn handle_vote_client(
                                 )
                                 .await;
                                 let elapsed = Instant::now() - command_start;
-                                log::info!("client_{} {command_name} {elapsed:?}", client_id.0);
+                                log::info!("{client_id} {command_name} {elapsed:?}");
                             },
                             Err(e) => {
                                 log::debug!("Bad message: {:?}: {:?}", msg, e);
@@ -371,10 +376,7 @@ async fn handle_vote_client(
                     log::debug!("Error reading client response: {}", err);
                     break
                 },
-                None => {
-                    log::debug!("Client {client_id:?} disconnected.");
-                    break
-                },
+                None => break,
             }
         }
     }
@@ -383,7 +385,7 @@ async fn handle_vote_client(
         let mut gs = global_state.lock().await;
         drop(rx);
         gs.prune_connection_handles(&room_id, client_id).await;
-        log::debug!("client {client_id:?} disconnected.");
+        log::debug!("closed connection from client {client_id}");
     }
 }
 

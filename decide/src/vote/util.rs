@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use rand::distributions::DistString;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
 
 /// Each websocket connection is a unique player.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -24,6 +24,12 @@ impl<'de> Deserialize<'de> for ClientId {
     {
         let s = String::deserialize(deserializer)?;
         Ok(Self(Uuid::from_str(&s).map_err(serde::de::Error::custom)?))
+    }
+}
+
+impl std::fmt::Display for ClientId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
