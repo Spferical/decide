@@ -10,6 +10,7 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use rand::{seq::SliceRandom, Rng};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use uuid::Uuid;
 
 use decide_api as api;
 
@@ -153,7 +154,8 @@ async fn client_work(
 impl VoteClient {
     async fn connect(base_url: &str, vote_id: &str, secure: bool) -> Self {
         let proto = if secure { "wss" } else { "ws" };
-        let url = format!("{proto}://{base_url}/api/vote/{vote_id}");
+        let client_id = Uuid::new_v4().to_string();
+        let url = format!("{proto}://{base_url}/api/vote/{vote_id}?id={client_id}");
         let mut ws = tokio_tungstenite::connect_async(url).await.unwrap().0;
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         // wait on initial sync
