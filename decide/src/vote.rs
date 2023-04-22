@@ -28,7 +28,7 @@ pub(crate) mod db;
 pub(crate) mod util;
 
 /// Interval at which inactive rooms are deleted.
-const CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
+const CLEANUP_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
 /// State for a room stored in process memory.
 /// All room changes are synchronized with a mutable reference to this struct.
