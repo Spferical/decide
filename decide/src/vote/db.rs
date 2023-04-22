@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     Row,
 };
 
@@ -66,7 +66,10 @@ pub(crate) struct Db {
 impl Db {
     pub async fn init() -> Result<Self, Box<dyn std::error::Error>> {
         let db_url = "sqlite://decide.sqlite";
-        let connection_options = SqliteConnectOptions::from_str(db_url)?.create_if_missing(true);
+        let connection_options = SqliteConnectOptions::from_str(db_url)?
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal);
         let db_pool = SqlitePoolOptions::new()
             .connect_with(connection_options)
             .await?;
