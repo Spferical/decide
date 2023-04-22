@@ -336,7 +336,11 @@ async fn handle_vote_client(
                 Some(Ok(msg)) => {
                     log::debug!("Got message: {:?}", msg);
                     if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
-                        break;
+                        break
+                    } else if msg.is_close() {
+                        break
+                    } else if msg.is_pong() {
+                        continue
                     }
                     match msg.to_str() {
                         Ok(msg) => match serde_json::from_str::<api::Command>(msg) {
