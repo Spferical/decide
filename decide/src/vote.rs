@@ -1,13 +1,12 @@
 use std::{
     collections::HashMap,
-    hash::Hash,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use api::VoteWebsocketQueryParams;
 use futures_util::{SinkExt, StreamExt};
-use rand::distributions::DistString;
+
 use tokio::sync::{watch, Mutex};
 use uuid::Uuid;
 use warp::{
@@ -20,38 +19,113 @@ use decide_api as api;
 
 use crate::{condorcet::ranked_pairs, WebResult};
 
-/// Time after which a room will be deleted if it has no activity.
-const ROOM_EXPIRY: std::time::Duration = std::time::Duration::from_secs(60 * 60 * 24);
+use self::{
+    db::{Db, DbRoom},
+    util::{ClientId, RoomId},
+};
+
+pub(crate) mod db;
+pub(crate) mod util;
+
 /// Interval at which inactive rooms are deleted.
-const CLEANUP_INTERVAL: Duration = Duration::from_secs(60 * 60);
+const CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
 
-/// Each websocket connection is a unique player.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct ClientId(Uuid);
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-struct RoomId(String);
-
-impl RoomId {
-    fn new_random() -> Self {
-        Self(rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), 8))
-    }
-}
-
-impl std::fmt::Display for RoomId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-struct Room {
+/// State for a room stored in process memory.
+/// All room changes are synchronized with a mutable reference to this struct.
+/// Note: the database is the source of truth for the room state.
+struct ServerRoom {
     // Each client may have multiple tabs open.
     clients: HashMap<ClientId, Vec<ConnectionHandle>>,
-    choices: Vec<String>,
-    votes: HashMap<ClientId, api::UserVote>,
-    results: Option<api::CondorcetTally>,
-    // Timestamp of last room activity.
-    last_active: Instant,
+    // NOTE: the database tally_calculated flag is the source of truth for
+    // whether the results are officially tallied i.e. the vote is done.
+    // This field is only used to avoid re-calculating the results.
+    results_cache: Option<api::CondorcetTally>,
+}
+
+impl ServerRoom {
+    fn new() -> Self {
+        Self {
+            clients: HashMap::new(),
+            results_cache: None,
+        }
+    }
+
+    fn add_client(&mut self, client_id: ClientId, handle: ConnectionHandle, db_room: &DbRoom) {
+        self.clients.entry(client_id).or_default().push(handle);
+        self.broadcast_room_state(db_room)
+    }
+
+    fn update_results_cache(&mut self, db_room: &DbRoom) {
+        if db_room.tallied && self.results_cache.is_none() {
+            self.results_cache = Some(calculate_room_tally(&db_room.choices, &db_room.votes));
+        } else if !db_room.tallied && self.results_cache.is_some() {
+            log::error!("Results cache incorrectly populated");
+            self.results_cache = None;
+        }
+    }
+
+    fn broadcast_room_state(&mut self, db_room: &DbRoom) {
+        self.update_results_cache(db_room);
+        for (client_id, client) in self.clients.iter() {
+            for handle in client {
+                handle
+                    .tx
+                    .send(Some(self.get_client_notification(client_id, db_room)))
+                    .ok();
+            }
+        }
+    }
+
+    fn get_client_notification(
+        &self,
+        client_id: &ClientId,
+        db_room: &DbRoom,
+    ) -> api::ClientNotification {
+        let DbRoom {
+            choices,
+            votes,
+            tallied,
+        } = db_room;
+        if *tallied != self.results_cache.is_some() {
+            log::error!(
+                "Results cache incorrect. Tallied: {tallied}, cache: {}",
+                self.results_cache.is_some()
+            );
+        }
+        api::ClientNotification {
+            status: api::ClientStatus::Connected,
+            vote: Some(api::VoteView {
+                choices: choices.clone(),
+                your_vote: votes.get(&client_id).cloned(),
+                num_votes: votes.len(),
+                num_players: self.clients.len(),
+                results: self.results_cache.as_ref().map(|tally| api::VotingResults {
+                    tally: tally.clone(),
+                    votes: db_room.votes.values().cloned().collect(),
+                }),
+            }),
+        }
+    }
+
+    async fn submit_vote(
+        &mut self,
+        room_id: &RoomId,
+        client_id: ClientId,
+        vote: api::UserVote,
+        db: &Db,
+    ) {
+        let mut db_room = db.read_room_state(room_id).await.expect("Missing DB room");
+        db_room.votes.insert(client_id, vote);
+        db.write_room_state(room_id, db_room.clone()).await;
+        self.broadcast_room_state(&db_room);
+    }
+
+    async fn tally(&mut self, room_id: &RoomId, db: &Db) {
+        let mut db_room = db.read_room_state(room_id).await.expect("Missing DB room");
+        db_room.tallied = true;
+        db.write_room_state(room_id, db_room.clone()).await;
+        self.broadcast_room_state(&db_room);
+    }
 }
 
 /// Handle to the async task managing one client's websocket connection.
@@ -60,111 +134,113 @@ struct ConnectionHandle {
     tx: watch::Sender<Option<api::ClientNotification>>,
 }
 
-struct VoteState {
-    rooms: HashMap<RoomId, Room>,
+pub struct VoteState {
+    rooms: HashMap<RoomId, ServerRoom>,
+    db: Db,
+}
+
+fn calculate_room_tally(
+    choices: &[String],
+    votes: &HashMap<ClientId, api::UserVote>,
+) -> api::CondorcetTally {
+    let num_choices = choices.len();
+    let votes: Vec<Vec<crate::condorcet::VoteItem>> = votes
+        .values()
+        .map(|v| {
+            v.selections
+                .iter()
+                .map(|item| crate::condorcet::VoteItem {
+                    candidate: item.candidate,
+                    rank: item.rank,
+                })
+                .collect()
+        })
+        .collect();
+    let results = ranked_pairs(num_choices, votes);
+    let results = api::CondorcetTally {
+        ranks: results.ranks,
+        totals: results.totals,
+    };
+    results
 }
 
 impl VoteState {
-    fn new() -> Self {
-        Self {
+    async fn init() -> Result<Self, Box<dyn std::error::Error>> {
+        let db = Db::init().await?;
+        Ok(Self {
             rooms: HashMap::new(),
-        }
+            db,
+        })
     }
 
-    async fn create_room(&mut self, choices: Vec<String>) -> RoomId {
-        let room_id = RoomId::new_random();
-        self.rooms.insert(
-            room_id.clone(),
-            Room {
-                choices,
-                votes: HashMap::new(),
-                clients: HashMap::new(),
-                results: None,
-                last_active: Instant::now(),
-            },
-        );
-        room_id
+    async fn create_room(&self, choices: Vec<String>) -> RoomId {
+        self.db.create_room(choices).await
     }
 
-    /// Returns false if the room does not exist, else true.
     async fn register_client(
         &mut self,
         room_id: &RoomId,
         client_id: ClientId,
         tx: watch::Sender<Option<api::ClientNotification>>,
     ) -> bool {
-        if let Some(room) = self.rooms.get_mut(room_id) {
-            room.clients
-                .entry(client_id)
-                .or_default()
-                .push(ConnectionHandle { tx });
-            room.last_active = Instant::now();
-            self.broadcast_state(&room_id).await;
-            true
-        } else {
-            false
-        }
+        let db_room = match self.db.read_room_state(room_id).await {
+            Some(room) => room,
+            None => {
+                log::error!("client {client_id:?} gave invalid room {room_id}");
+                return false;
+            }
+        };
+        self.db.bump_room_activity(room_id).await;
+        let room = self
+            .rooms
+            .entry(room_id.clone())
+            .or_insert_with(ServerRoom::new);
+        room.add_client(client_id, ConnectionHandle { tx }, &db_room);
+        true
     }
 
-    /// Add a submitted vote to a room. Does nothing if the room does not exist or the results
-    /// are already tallied.
     async fn submit_vote(&mut self, room_id: &RoomId, client_id: ClientId, vote: api::UserVote) {
         if let Some(room) = self.rooms.get_mut(room_id) {
-            if room.results.is_none() {
-                room.votes.insert(client_id, vote);
-                room.last_active = Instant::now();
-                self.broadcast_state(&room_id).await;
-            }
+            room.submit_vote(room_id, client_id, vote, &self.db).await
         }
     }
 
-    fn get_client_notification(
-        &self,
-        client_id: &ClientId,
-        room: &Room,
-    ) -> api::ClientNotification {
-        api::ClientNotification {
-            status: api::ClientStatus::Connected,
-            vote: Some(api::VoteView {
-                choices: room.choices.clone(),
-                your_vote: room.votes.get(client_id).cloned(),
-                num_votes: room.votes.len(),
-                results: room.results.as_ref().map(|tally| api::VotingResults {
-                    tally: tally.clone(),
-                    votes: room.votes.values().cloned().collect(),
-                }),
-                num_players: room.clients.len(),
-            }),
+    async fn tally(&mut self, room_id: &RoomId) {
+        if let Some(room) = self.rooms.get_mut(room_id) {
+            room.tally(room_id, &self.db).await
         }
     }
 
-    async fn broadcast_state(&self, room_id: &RoomId) {
-        if let Some(room) = self.rooms.get(room_id) {
-            for (client_id, client_infos) in room.clients.iter() {
-                for client_info in client_infos.iter() {
-                    client_info
-                        .tx
-                        .send_replace(Some(self.get_client_notification(client_id, room)));
+    async fn prune_connection_handles(&mut self, room_id: &RoomId, client_id: ClientId) {
+        let mut remove_room = false;
+        if let Some(room) = self.rooms.get_mut(room_id) {
+            if let Some(client_connections) = room.clients.get_mut(&client_id) {
+                client_connections.retain(|conn| !conn.tx.is_closed());
+                log::debug!("{} connections left", client_connections.len());
+                if client_connections.is_empty() {
+                    room.clients.remove(&client_id);
                 }
             }
+            if room.clients.is_empty() {
+                remove_room = true;
+            }
+            let db_room = self
+                .db
+                .read_room_state(room_id)
+                .await
+                .expect("Missing DB room");
+            room.broadcast_room_state(&db_room);
+        }
+        if remove_room {
+            self.rooms.remove(room_id);
         }
     }
 
     async fn cleanup_rooms(&mut self) {
-        let now = Instant::now();
-        self.rooms.retain(|room_id, room| {
-            if !room.clients.is_empty() {
-                room.last_active = Instant::now();
-                true
-            } else {
-                let elapsed = now - room.last_active;
-                let keep = elapsed < ROOM_EXPIRY || !room.clients.is_empty();
-                if !keep {
-                    log::info!("Deleting room {}", room_id.0);
-                }
-                keep
-            }
-        });
+        for room_id in self.rooms.keys() {
+            self.db.bump_room_activity(room_id).await;
+        }
+        self.db.cleanup_rooms().await;
     }
 }
 
@@ -234,37 +310,7 @@ async fn handle_vote_client(
             }
             api::Command::Tally => {
                 let mut gs = global_state.lock().await;
-                let room = match gs.rooms.get_mut(&room_id) {
-                    Some(room) => room,
-                    // Room's closing.
-                    None => return,
-                };
-                if room.results.is_some() {
-                    // No need to recalculate.
-                    return;
-                }
-                let num_choices = room.choices.len();
-                let votes: Vec<Vec<crate::condorcet::VoteItem>> = room
-                    .votes
-                    .values()
-                    .map(|v| {
-                        v.selections
-                            .iter()
-                            .map(|item| crate::condorcet::VoteItem {
-                                candidate: item.candidate,
-                                rank: item.rank,
-                            })
-                            .collect()
-                    })
-                    .collect();
-                let results = ranked_pairs(num_choices, votes);
-                let results = api::CondorcetTally {
-                    ranks: results.ranks,
-                    totals: results.totals,
-                };
-                room.results = Some(results.into());
-                log::debug!("Vote results: {:?}", room.results);
-                gs.broadcast_state(&room_id).await;
+                gs.tally(&room_id).await;
             }
         }
     };
@@ -332,22 +378,13 @@ async fn handle_vote_client(
         // cleanup
         let mut gs = global_state.lock().await;
         drop(rx);
-        if let Some(room) = gs.rooms.get_mut(&room_id) {
-            if let Some(client_connections) = room.clients.get_mut(&client_id) {
-                client_connections.retain(|conn| !conn.tx.is_closed());
-                log::debug!("{} connections left", client_connections.len());
-                if client_connections.is_empty() {
-                    room.clients.remove(&client_id);
-                }
-            }
-        }
-        gs.broadcast_state(&room_id).await;
+        gs.prune_connection_handles(&room_id, client_id).await;
         log::debug!("client {client_id:?} disconnected.");
     }
 }
 
 // Background task that cleans up old rooms.
-async fn cleanup_task(global_state: Arc<Mutex<VoteState>>) {
+async fn run_cleanup_task(global_state: Arc<Mutex<VoteState>>) {
     loop {
         tokio::time::sleep(CLEANUP_INTERVAL).await;
         let mut gs = global_state.lock().await;
@@ -356,9 +393,10 @@ async fn cleanup_task(global_state: Arc<Mutex<VoteState>>) {
 }
 
 #[allow(opaque_hidden_inferred_bound)]
-pub fn routes() -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let vote_state = Arc::new(Mutex::new(VoteState::new()));
-    tokio::spawn(cleanup_task(vote_state.clone()));
+pub async fn routes(
+) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    let vote_state = Arc::new(Mutex::new(VoteState::init().await.unwrap()));
+    tokio::spawn(run_cleanup_task(vote_state.clone()));
     let with_vote_state = warp::any().map(move || vote_state.clone());
     let new_vote_route = warp::path!("api" / "start_vote")
         .and(warp::post())

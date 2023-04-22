@@ -17,7 +17,7 @@ pub struct VoteItem {
     pub rank: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClientStatus {
     Connected,
@@ -25,13 +25,13 @@ pub enum ClientStatus {
     InvalidUuid,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VotingResults {
     pub tally: CondorcetTally,
     pub votes: Vec<UserVote>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VoteView {
     pub choices: Vec<String>,
     pub your_vote: Option<UserVote>,
@@ -75,7 +75,7 @@ impl Command {
 }
 
 /// Data serialized and sent to the client in response to a command or other change in state.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize,)]
 pub struct ClientNotification {
     pub status: ClientStatus,
     pub vote: Option<VoteView>,
