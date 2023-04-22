@@ -25,7 +25,7 @@ function get_vote_uuid() {
         return cookie;
     }
     let uuid = uuidv4();
-    Cookies.set("VOTE_ID", uuid, { sameSite: "strict" });
+    Cookies.set("VOTE_ID", uuid, { sameSite: "strict", secure: true });
     return uuid;
 }
 
