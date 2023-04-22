@@ -195,7 +195,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
             // Mapping of sorted position -> choice index.
             order: Array(props.choices.length).fill(null).map((_, i) => i),
             // true if sorted choice i is > choice i+1, else false if equal.
-            gt: Array(props.choices.length - 1).fill(true),
+            gt: Array(Math.max(0, props.choices.length - 1)).fill(true),
             selected: null,
         };
         this.set_selections(props.initial_ranks);
