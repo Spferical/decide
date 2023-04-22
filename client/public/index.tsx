@@ -487,15 +487,45 @@ class Vote extends Component<VoteProps, VoteState> {
     }
 }
 
+class ErrorBoundary extends Component {
+    state = { error: null }
+
+    componentDidCatch(error) {
+        console.error(error)
+        this.setState({ error })
+    }
+
+    render() {
+        if (this.state.error) {
+            return <Fragment>
+                <main>
+                    <p> Oops! Something went wrong. </p>
+                    <p> <a href="javascript:void(0)" onClick={() => location.reload()}>Click here to refresh the page.</a></p>
+                    <section>
+                        <p> {this.state.error.toString()} </p>
+                        <details>
+                            <summary> Extra details: </summary>
+                            <pre>{this.state.error.stack}</pre>
+                        </details>
+                    </section>
+                </main>
+            </Fragment>
+        }
+        return this.props.children
+    }
+}
+
 export default function App() {
     return (
-        <Router>
-            <Index path="/" />
-            {/* @ts-ignore */}
-            <Rps path="/rps/:room?" />
-            {/* @ts-ignore */}
-            <Vote path="/vote/:room?" />
-        </Router>
+        <ErrorBoundary>
+            <Router>
+                <Index path="/" />
+                {/* @ts-ignore */}
+                <Rps path="/rps/:room?" />
+                {/* @ts-ignore */}
+                <Vote path="/vote/:room?" />
+            </Router>
+        </ErrorBoundary>
     );
 }
 
