@@ -24,6 +24,7 @@ function Index() {
                 <li> No login required: Anyone with the URL can participate in a poll.</li>
                 <li> Simple and intuitive interface: Just enter the options up for vote and send a link.</li>
                 <li> Quick and easy to use: Finish voting at any time with just one click. </li>
+                <li> No order bias: Options are shuffled for each voter.</li>
                 <li> Safe and secure: All data is wiped after 24 hours.</li>
                 <li> Rock-paper-scissors: Settle ties with the classic rock-paper-scissors game.</li>
             </ul >
