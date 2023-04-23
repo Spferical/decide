@@ -148,7 +148,7 @@ class Rps extends Component<RpsProps, RpsState> {
             <Fragment>
                 <main>
                     {is_player && <div>
-                        {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect.</p>}
+                        {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect:<br /><code>{window.location.href}</code></p>}
                         <p>
                             <button onClick={get_onclick("rock")}>rock</button>
                             {" "}
