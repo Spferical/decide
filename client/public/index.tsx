@@ -496,7 +496,7 @@ class Vote extends Component<VoteProps, VoteState> {
         return (
             <Fragment>
                 <main>
-                    {state.vote.num_players <= 1 && <p>Send this URL to all voters: <code>{window.location.href}</code></p>}
+                    {state.vote.num_players <= 1 && <p class="notice"> Send this URL to all voters:<br /><code>{window.location.href}</code> </p>}
                     {!state.vote.results && ballot_section}
                     {submitted_section}
                     {!state.vote.results && <p><button onClick={tally}>End Voting and Show the Results</button></p>}
