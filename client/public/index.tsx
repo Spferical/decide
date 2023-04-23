@@ -11,11 +11,29 @@ function Index() {
     function vote() {
         route("/vote/");
     }
+    document.title = "Decide.pfe.io";
     return (
         <main>
-            <h2><a href="javascript:void(0)" onClick={vote}>Condorcet Voting</a></h2>
-            <h2><a href="javascript:void(0)" onClick={rps}>Rock Paper Scissors</a></h2>
-        </main>
+            <h2> Decide.pfe.io </h2>
+            <p> Welcome to Decide.pfe.io, the easiest way to run a quick and fair ranked vote for a small group! </p>
+            <p><button href="javascript:void(0)" onClick={vote}>Start a Vote</button></p>
+            <p><button href="javascript:void(0)" onClick={rps}>Play Rock Paper Scissors</button></p>
+            <h4> About </h4>
+            <p> Decide.pfe.io is a simple website for running a short ranked vote for a small group. Features include: </p>
+            <ul>
+                <li> No login required: Anyone with the URL can participate in a poll.</li>
+                <li> Simple and intuitive interface: Just enter the options up for vote and send a link.</li>
+                <li> Quick and easy to use: Finish voting at any time with just one click. </li>
+                <li> Safe and secure: All data is wiped after 24 hours.</li>
+                <li> Rock-paper-scissors: Settle ties with the classic rock-paper-scissors game.</li>
+            </ul >
+            <h4> How are votes tallied? </h4>
+            <p> Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet voting ensures that the winning option is the one that beats all other options in head-to-head matchups, making it fair and representative.</p>
+            <p>See <a href="https://condorcet.ericgorr.net/">condorcet.ericgorr.net</a> for an excellent voting calculator.</p>
+            <h4> More Details </h4>
+            <p> Decide.pfe.io is free and open source. <a href="https://github.com/Spferical/decide">The source code is available here</a>.</p>
+            <p>Please contact me at <a href="mailto: matthew@pfe.io">matthew@pfe.io</a> with any questions, comments, or concerns.</p>
+        </main >
     )
 }
 
@@ -373,8 +391,7 @@ class Vote extends Component<VoteProps, VoteState> {
     render(props: VoteProps, state: VoteState) {
         if (!props.room) {
             return <Fragment>
-                <h2>Condorcet Voting (Ranked Pairs)</h2>
-                <p><a href="https://en.wikipedia.org/wiki/Condorcet_method">What is Condorcet Voting?</a></p>
+                <h2>Start a Vote</h2>
                 <form action="/api/start_vote" method="post">
                     <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
                     <p><textarea name="choices" /></p>
