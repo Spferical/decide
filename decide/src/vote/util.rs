@@ -38,7 +38,7 @@ pub struct RoomId(pub String);
 
 impl RoomId {
     pub fn new_random() -> Self {
-        Self(rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), 8))
+        Self(rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), 20))
     }
 }
 
