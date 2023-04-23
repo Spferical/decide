@@ -81,34 +81,42 @@ type RoomView = {
 }
 
 type RpsState = {
+    room: string,
     status: string,
     room_state: RoomView | null
 }
 
 class Rps extends Component<RpsProps, RpsState> {
-    state = { status: "connecting", room_state: null };
+    state = { room: null, status: "connecting", room_state: null };
     ws = null;
-    room = null;
-
-    constructor(props: RpsProps) {
-        super();
-        this.room = props.room;
-    }
 
     componentDidMount() {
         document.title = "Rock Paper Scissors"
-        let ws = make_websocket(`/api/rps/${this.room}`);
-        ws.onclose = () => this.setState({ status: "disconnected" });
-        ws.onmessage = msg => this.setState(JSON.parse(msg.data));
-        this.ws = ws;
     }
 
-    render(_props: RpsProps, state: RpsState) {
+    componentDidUnmount() {
+        this.ws.close();
+    }
+
+    render(props: RpsProps, state: RpsState) {
+        if (state.room != props.room) {
+            state.room = props.room;
+            this.ws = make_websocket(`/api/rps/${state.room}`);
+            this.ws.onclose = evt => {
+                console.log("Websocket disconnected!");
+                console.log(evt);
+                this.setState({ status: "disconnected" })
+            };
+            this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
+        }
         if (state.status == "connecting") {
             return <footer>Connecting...</footer>;
         } else if (state.status == "disconnected") {
             return <footer>Disconnected! Try refreshing.</footer>;
         }
+
+        console.assert(state.room_state != null);
+
         let player_view = state.room_state.player_view;
         let spectator_view = state.room_state.spectator_view;
         const is_player = !!player_view;

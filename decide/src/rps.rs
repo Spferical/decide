@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use futures_util::{sink::SinkExt, stream::StreamExt};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{watch, Mutex};
 use warp::{
     ws::{Message, WebSocket},
     Filter,
@@ -51,7 +51,7 @@ struct PlayerState {
 }
 
 struct ClientInfo {
-    tx: mpsc::Sender<ClientNotification>,
+    tx: watch::Sender<Option<ClientNotification>>,
 }
 
 #[derive(Default)]
@@ -200,11 +200,10 @@ impl RpsState {
             let view = self.get_game_view(room_id, *client_id);
             client_info
                 .tx
-                .send(ClientNotification {
+                .send(Some(ClientNotification {
                     room_state: Some(view),
                     status: ClientStatus::Connected,
-                })
-                .await
+                }))
                 // Ignore send errors; player could have dropped.
                 .ok();
         }
@@ -212,7 +211,7 @@ impl RpsState {
 }
 
 async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, mut ws: WebSocket) {
-    let (tx, mut rx) = mpsc::channel(1);
+    let (tx, mut rx) = watch::channel(None);
     let room_id = RoomId(room_id);
     let client_id;
     {
@@ -233,7 +232,10 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
                     log::debug!("Player {client_id:?} chose {choice:?}");
                     let mut gs = global_state.lock().await;
                     let room = gs.rooms.get_mut(&room_id).unwrap();
-                    room.players.get_mut(&client_id).unwrap().choice = Some(choice);
+                    match room.players.get_mut(&client_id) {
+                        Some(mut player_info) => player_info.choice = Some(choice),
+                        None => return,
+                    }
                     let choices = room
                         .players
                         .iter()
@@ -260,16 +262,19 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
     };
     loop {
         tokio::select! {
-            msg = rx.recv() => match msg {
-                Some(msg) => {
-                    let msg = serde_json::to_string(&msg).unwrap();
-                    if let Err(err) = ws.send(Message::text(msg)).await {
+            msg = rx.changed() => match msg {
+                Ok(()) => {
+                    let serialized_msg = {
+                        let borrowed_msg = rx.borrow_and_update();
+                        serde_json::to_string(borrowed_msg.as_ref().unwrap()).unwrap()
+                    };
+                    if let Err(err) = ws.send(Message::text(serialized_msg)).await {
                         log::debug!("Error sending message to client: {}", err);
                         break
                     }
                 },
                 // server must be shutting down
-                None => break,
+                Err(_) => break,
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
@@ -315,7 +320,7 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
         let room = gs.rooms.get_mut(&room_id).unwrap();
         room.players.remove(&client_id);
         room.clients.remove(&client_id);
-        if room.players.is_empty() {
+        if room.clients.is_empty() {
             gs.rooms.remove(&room_id);
         } else {
             gs.broadcast_state(&room_id).await;
