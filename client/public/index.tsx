@@ -94,8 +94,10 @@ class Rps extends Component<RpsProps, RpsState> {
         document.title = "Rock Paper Scissors"
     }
 
-    componentDidUnmount() {
-        this.ws.close();
+    componentWillUnmount() {
+        try {
+            this.ws.close();
+        } catch (_) { }
     }
 
     render(props: RpsProps, state: RpsState) {
@@ -394,6 +396,12 @@ class Vote extends Component<VoteProps, VoteState> {
 
     componentDidMount() {
         document.title = "Vote";
+    }
+
+    componentWillUnmount() {
+        try {
+            this.ws.close();
+        } catch (_) { }
     }
 
     render(props: VoteProps, state: VoteState) {
