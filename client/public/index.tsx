@@ -29,7 +29,6 @@ function Index() {
             </ul >
             <h4> How are votes tallied? </h4>
             <p> Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet voting ensures that the winning option is the one that beats all other options in head-to-head matchups, making it fair and representative.</p>
-            <p>See <a href="https://condorcet.ericgorr.net/">condorcet.ericgorr.net</a> for an excellent voting calculator.</p>
             <h4> More Details </h4>
             <p> Decide.pfe.io is free and open source. <a href="https://github.com/Spferical/decide">The source code is available here</a>.</p>
             <p>Please contact me at <a href="mailto: matthew@pfe.io">matthew@pfe.io</a> with any questions, comments, or concerns.</p>
