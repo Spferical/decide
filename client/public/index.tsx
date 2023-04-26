@@ -16,8 +16,8 @@ function Index() {
         <main>
             <h2> Decide.pfe.io </h2>
             <p> Welcome to Decide.pfe.io, the easiest way to run a quick and fair ranked vote for a small group! </p>
-            <p><button href="javascript:void(0)" onClick={vote}>Start a Vote</button></p>
-            <p><button href="javascript:void(0)" onClick={rps}>Play Rock Paper Scissors</button></p>
+            <p><button href="javascript:void(0)" onClick={vote}>🗳️ Start a Vote</button></p>
+            <p><button href="javascript:void(0)" onClick={rps}>🪨📄✂️ Play Rock Paper Scissors</button></p>
             <h4> About </h4>
             <p> Decide.pfe.io is a simple website for running a short ranked vote for a small group. Features include: </p>
             <ul>
