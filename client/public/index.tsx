@@ -24,15 +24,15 @@ function Index() {
                 <li> No login required: Anyone with the URL can participate in a poll.</li>
                 <li> Simple and intuitive interface: Just enter the options up for vote and send a link.</li>
                 <li> Quick and easy to use: Finish voting at any time with just one click. </li>
-                <li> No order bias: Options are shuffled for each voter.</li>
-                <li> Safe and secure: All data is wiped after 24 hours.</li>
-                <li> Rock-paper-scissors: Settle ties with the classic rock-paper-scissors game.</li>
+                <li> Options are shuffled for each voter, eliminating any bias towards the first or last option.</li>
+                <li> All data is wiped after 24 hours.</li>
+                <li> Settle ties with the classic rock-paper-scissors game.</li>
             </ul >
             <h4> How are votes tallied? </h4>
             <p> Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet voting ensures that the winning option is the one that beats all other options in head-to-head matchups, making it fair and representative.</p>
             <h4> More Details </h4>
             <p> Decide.pfe.io is free and open source. <a href="https://github.com/Spferical/decide">The source code is available here</a>.</p>
-            <p>Please contact me at <a href="mailto: matthew@pfe.io">matthew@pfe.io</a> with any questions, comments, or concerns.</p>
+            <p>Please contact me at <a href="mailto: matthew@pfe.io">matthew@pfe.io</a> with any questions or feedback!</p>
         </main >
     )
 }
