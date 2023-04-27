@@ -1,4 +1,5 @@
 import { Component, createRef, Fragment, render, VNode } from 'preact';
+import { useState } from 'preact/hooks';
 import { route, Router } from 'preact-router';
 import Cookies from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
@@ -86,6 +87,18 @@ type RpsState = {
     room_state: RoomView | null
 }
 
+function CopyLink() {
+    const initial_text = "<-- Click to copy!";
+    const [infoText, setText] = useState(initial_text);
+    return <Fragment>
+        <span class="copyurl" onClick={e => {
+            navigator.clipboard.writeText(window.location.href);
+            setText("<-- Copied!");
+            setTimeout(() => setText(initial_text), 1000);
+        }}>{window.location.href}</span> {infoText}
+    </Fragment>;
+}
+
 class Rps extends Component<RpsProps, RpsState> {
     state = { room: null, status: "connecting", room_state: null };
     ws = null;
@@ -149,7 +162,9 @@ class Rps extends Component<RpsProps, RpsState> {
             <Fragment>
                 <main>
                     {is_player && <div>
-                        {(state.room_state.num_players < 2) && <p>Send this URL to your opponent to connect:<br /><code>{window.location.href}</code></p>}
+                        {(state.room_state.num_players < 2) && <p class="notice">
+                            Send this URL to your opponent to connect.<br /> <CopyLink />
+                        </p>}
                         <p>
                             <button onClick={get_onclick("rock")}>rock</button>
                             {" "}
@@ -504,7 +519,7 @@ class Vote extends Component<VoteProps, VoteState> {
         return (
             <Fragment>
                 <main>
-                    {state.vote.num_players <= 1 && <p class="notice"> Send this URL to all voters:<br /><code>{window.location.href}</code> </p>}
+                    {state.vote.num_players <= 1 && <p class="notice"> Send this URL to all voters:<br /><CopyLink /> </p>}
                     {!state.vote.results && ballot_section}
                     {submitted_section}
                     {!state.vote.results && <p><button onClick={tally}>End Voting and Show the Results</button></p>}

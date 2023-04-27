@@ -18,3 +18,17 @@
     border: 1px solid var(--accent);
 }
 
+.copyurl {
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    background-color: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    box-shadow: none;
+    max-width: 100%;
+    display: inline-block;
+    cursor: pointer;
+}
