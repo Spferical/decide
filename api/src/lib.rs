@@ -75,7 +75,7 @@ impl Command {
 }
 
 /// Data serialized and sent to the client in response to a command or other change in state.
-#[derive(Clone, Debug, Serialize, Deserialize,)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClientNotification {
     pub status: ClientStatus,
     pub vote: Option<VoteView>,

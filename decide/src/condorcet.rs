@@ -140,12 +140,16 @@ mod test {
     fn test_is_reachable() {
         assert!(is_reachable(0, 1, &[[1].into(), [].into()]));
         assert!(!is_reachable(1, 0, &[[1].into(), [].into()]));
-        assert!(
-            is_reachable(0, 3, &[[1].into(), [2].into(), [3].into(), [].into()])
-        );
-        assert!(
-            !is_reachable(3, 0, &[[1].into(), [2].into(), [3].into(), [].into()])
-        );
+        assert!(is_reachable(
+            0,
+            3,
+            &[[1].into(), [2].into(), [3].into(), [].into()]
+        ));
+        assert!(!is_reachable(
+            3,
+            0,
+            &[[1].into(), [2].into(), [3].into(), [].into()]
+        ));
         let complicated_graph = &[
             [4].into(),
             [6].into(),
