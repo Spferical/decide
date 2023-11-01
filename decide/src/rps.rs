@@ -233,7 +233,7 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
                     let mut gs = global_state.lock().await;
                     let room = gs.rooms.get_mut(&room_id).unwrap();
                     match room.players.get_mut(&client_id) {
-                        Some(mut player_info) => player_info.choice = Some(choice),
+                        Some(player_info) => player_info.choice = Some(choice),
                         None => return,
                     }
                     let choices = room
@@ -251,7 +251,7 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
                                 .collect(),
                         );
                         // clear choices
-                        for (_client_id, mut player_state) in room.players.iter_mut() {
+                        for (_client_id, player_state) in room.players.iter_mut() {
                             player_state.choice = None;
                         }
                     }
@@ -332,11 +332,11 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
 pub fn routes() -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     let rps_state = Arc::new(Mutex::new(RpsState::new()));
     let with_rps_state = warp::any().map(move || rps_state.clone());
-    let rps_route = warp::path!("api" / "rps" / String)
+
+    warp::path!("api" / "rps" / String)
         .and(warp::ws())
         .and(with_rps_state)
         .and_then(|room_id, ws: warp::ws::Ws, rooms| async move {
             WebResult::Ok(ws.on_upgrade(|ws| handle_rps_client(rooms, room_id, ws)))
-        });
-    rps_route
+        })
 }

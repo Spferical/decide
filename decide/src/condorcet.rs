@@ -71,11 +71,9 @@ pub fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetT
     // 1. strength of victory (number of votes favoring a over b)
     // 2. margin (difference in voters favoring a vs favoring b)
     let mut defeats = (0..num_choices)
-        .into_iter()
         .flat_map(|c| {
             let totals = &totals;
             (0..num_choices)
-                .into_iter()
                 .filter(move |&c2| totals[c][c2] > totals[c2][c])
                 .map(move |c2| (c, c2))
         })
@@ -118,7 +116,7 @@ pub fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetT
         }
     }
 
-    let mut unranked = (0..num_choices).into_iter().collect::<Vec<_>>();
+    let mut unranked = (0..num_choices).collect::<Vec<_>>();
     let mut ranks = vec![];
     while !unranked.is_empty() {
         // Find winners, i.e. undefeated nodes.
@@ -140,15 +138,13 @@ mod test {
 
     #[test]
     fn test_is_reachable() {
-        assert_eq!(is_reachable(0, 1, &[[1].into(), [].into()]), true);
-        assert_eq!(is_reachable(1, 0, &[[1].into(), [].into()]), false);
-        assert_eq!(
-            is_reachable(0, 3, &[[1].into(), [2].into(), [3].into(), [].into()]),
-            true
+        assert!(is_reachable(0, 1, &[[1].into(), [].into()]));
+        assert!(!is_reachable(1, 0, &[[1].into(), [].into()]));
+        assert!(
+            is_reachable(0, 3, &[[1].into(), [2].into(), [3].into(), [].into()])
         );
-        assert_eq!(
-            is_reachable(3, 0, &[[1].into(), [2].into(), [3].into(), [].into()]),
-            false
+        assert!(
+            !is_reachable(3, 0, &[[1].into(), [2].into(), [3].into(), [].into()])
         );
         let complicated_graph = &[
             [4].into(),
@@ -159,24 +155,24 @@ mod test {
             [1, 2].into(),
             [0].into(),
         ];
-        assert_eq!(is_reachable(0, 1, complicated_graph), true);
-        assert_eq!(is_reachable(0, 2, complicated_graph), true);
-        assert_eq!(is_reachable(0, 3, complicated_graph), false);
-        assert_eq!(is_reachable(0, 4, complicated_graph), true);
-        assert_eq!(is_reachable(0, 5, complicated_graph), true);
-        assert_eq!(is_reachable(0, 6, complicated_graph), true);
-        assert_eq!(is_reachable(2, 0, complicated_graph), true);
-        assert_eq!(is_reachable(2, 1, complicated_graph), true);
-        assert_eq!(is_reachable(2, 3, complicated_graph), false);
-        assert_eq!(is_reachable(2, 4, complicated_graph), true);
-        assert_eq!(is_reachable(2, 5, complicated_graph), true);
-        assert_eq!(is_reachable(2, 6, complicated_graph), true);
-        assert_eq!(is_reachable(3, 0, complicated_graph), true);
-        assert_eq!(is_reachable(3, 1, complicated_graph), true);
-        assert_eq!(is_reachable(3, 2, complicated_graph), true);
-        assert_eq!(is_reachable(3, 4, complicated_graph), true);
-        assert_eq!(is_reachable(3, 5, complicated_graph), true);
-        assert_eq!(is_reachable(3, 6, complicated_graph), true);
+        assert!(is_reachable(0, 1, complicated_graph));
+        assert!(is_reachable(0, 2, complicated_graph));
+        assert!(!is_reachable(0, 3, complicated_graph));
+        assert!(is_reachable(0, 4, complicated_graph));
+        assert!(is_reachable(0, 5, complicated_graph));
+        assert!(is_reachable(0, 6, complicated_graph));
+        assert!(is_reachable(2, 0, complicated_graph));
+        assert!(is_reachable(2, 1, complicated_graph));
+        assert!(!is_reachable(2, 3, complicated_graph));
+        assert!(is_reachable(2, 4, complicated_graph));
+        assert!(is_reachable(2, 5, complicated_graph));
+        assert!(is_reachable(2, 6, complicated_graph));
+        assert!(is_reachable(3, 0, complicated_graph));
+        assert!(is_reachable(3, 1, complicated_graph));
+        assert!(is_reachable(3, 2, complicated_graph));
+        assert!(is_reachable(3, 4, complicated_graph));
+        assert!(is_reachable(3, 5, complicated_graph));
+        assert!(is_reachable(3, 6, complicated_graph));
     }
 
     // tt-munching macro to define example ballots.

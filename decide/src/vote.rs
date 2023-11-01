@@ -96,7 +96,7 @@ impl ServerRoom {
             status: api::ClientStatus::Connected,
             vote: Some(api::VoteView {
                 choices: choices.clone(),
-                your_vote: votes.get(&client_id).cloned(),
+                your_vote: votes.get(client_id).cloned(),
                 num_votes: votes.len(),
                 num_players: self.clients.len(),
                 results: self.results_cache.as_ref().map(|tally| api::VotingResults {
@@ -157,11 +157,11 @@ fn calculate_room_tally(
         })
         .collect();
     let results = ranked_pairs(num_choices, votes);
-    let results = api::CondorcetTally {
+
+    api::CondorcetTally {
         ranks: results.ranks,
         totals: results.totals,
-    };
-    results
+    }
 }
 
 impl VoteState {
@@ -340,6 +340,7 @@ async fn handle_vote_client(
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
                     log::debug!("Got message: {:?}", msg);
+                    #[allow(clippy::if_same_then_else)]
                     if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
                         break
                     } else if msg.is_close() {
