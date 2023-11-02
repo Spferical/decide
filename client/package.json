@@ -1,5 +1,8 @@
 {
+	"name": "decide",
+	"version": "3.2.7",
 	"private": true,
+	"files": ["dist"],
 	"scripts": {
 		"start": "wmr",
 		"build": "wmr build",

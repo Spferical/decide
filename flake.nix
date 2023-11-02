@@ -33,7 +33,11 @@
         inherit (pkgs) lib;
 
         craneLib = crane.lib.${system};
-        src = craneLib.cleanCargoSource (craneLib.path ./.);
+        src = lib.cleanSourceWith {
+          src = craneLib.path ./.;
+          filter = path: type: (craneLib.filterCargoSources path type) || (builtins.match ".*/migrations/.*$" path != null);
+        };
+
 
         # Common arguments can be set here to avoid repeating them later
         commonArgs = {
@@ -111,12 +115,44 @@
           });
         };
 
-        packages = {
-          default = decide;
-          decide-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs // {
-            inherit cargoArtifacts;
-          });
-        };
+        packages =
+          let
+            client = pkgs.buildNpmPackage {
+              pname = "decide-client";
+              version = "0.1.0";
+              src = ./client;
+              npmDepsHash = "sha256-HEAywFrsNZ8kBGEa58txtdujrLmdjFtzo2JISK4iCag=";
+            };
+          in
+          {
+            decide-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs // {
+              inherit cargoArtifacts;
+            });
+            default = decide;
+            client = client;
+            docker = pkgs.dockerTools.buildImage {
+              name = "decide";
+              tag = "latest";
+              created = "now";
+              runAsRoot = ''
+                #!${pkgs.runtimeShell}
+                mkdir -p /app/data/
+                chown 1000:1000 /app/data/
+                chmod 755 /app/data/
+              '';
+              config = {
+                Env = [
+                  "PATH=${pkgs.dumb-init}/bin/:${decide}/bin"
+                  "DECIDE_STATIC_PATH=${client}/lib/node_modules/decide/dist"
+                ];
+                ExposedPorts = {
+                  "8000/tcp" = { };
+                };
+                User = "1000:1000";
+                Entrypoint = [ "dumb-init" "--" "decide" "0.0.0.0:8000" "sqlite:///app/data/decide.sqlite" ];
+              };
+            };
+          };
 
         apps.default = flake-utils.lib.mkApp {
           drv = decide;
