@@ -133,6 +133,7 @@
             });
             default = decide;
             client = client;
+          } // (if builtins.match "^.*-linux$" system != null then {
             docker = pkgs.dockerTools.buildImage {
               name = "king-decide";
               tag = "latest";
@@ -155,7 +156,8 @@
                 Entrypoint = [ "dumb-init" "--" "decide" "0.0.0.0:8000" "sqlite:///app/data/decide.sqlite" ];
               };
             };
-          };
+
+          } else { });
 
         apps.default = flake-utils.lib.mkApp {
           drv = decide;
