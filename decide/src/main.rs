@@ -30,11 +30,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("Invalid URL: {}: {}", addr, e).into());
         }
     };
+    let static_path = std::env::var("DECIDE_STATIC_PATH").unwrap_or("static".into());
     let routes = vote::routes(&db_url)
         .await
         .or(rps::routes())
-        .or(warp::fs::dir("static"))
-        .or(warp::fs::file("static/index.html"))
+        .or(warp::fs::dir(static_path.clone()))
+        .or(warp::fs::file(static_path + "/index.html"))
         .with(log);
     warp::serve(routes).run(addr).await;
     Ok(())
