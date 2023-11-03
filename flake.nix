@@ -134,7 +134,7 @@
             default = decide;
             client = client;
             docker = pkgs.dockerTools.buildImage {
-              name = "decide";
+              name = "king-decide";
               tag = "latest";
               created = "now";
               runAsRoot = ''
