@@ -26,10 +26,7 @@
   outputs = { self, nixpkgs, crane, fenix, flake-utils, advisory-db, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
-
+        pkgs = import nixpkgs { inherit system; };
         inherit (pkgs) lib;
 
         craneLib = crane.lib.${system};
@@ -38,81 +35,30 @@
           filter = path: type: (craneLib.filterCargoSources path type) || (builtins.match ".*/migrations/.*$" path != null);
         };
 
-
-        # Common arguments can be set here to avoid repeating them later
         commonArgs = {
           inherit src;
           pname = "decide";
           version = "0.1.0";
           strictDeps = true;
-
-          buildInputs = [
-            # Add additional build inputs here
-          ] ++ lib.optionals pkgs.stdenv.isDarwin [
-            # Additional darwin specific inputs can be set here
-            pkgs.libiconv
-          ];
-
-          # Additional environment variables can be set directly
-          # MY_CUSTOM_VAR = "some value";
+          buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
         };
 
-        craneLibLLvmTools = craneLib.overrideToolchain
-          (fenix.packages.${system}.complete.withComponents [
-            "cargo"
-            "llvm-tools"
-            "rustc"
-          ]);
-
-        # Build *just* the cargo dependencies, so we can reuse
-        # all of that work (e.g. via cachix) when running in CI
+        craneLibLLvmTools = craneLib.overrideToolchain (fenix.packages.${system}.complete.withComponents [ "cargo" "llvm-tools" "rustc" ]);
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        # Build the actual crate itself, reusing the dependency
-        # artifacts from above.
-        decide = craneLib.buildPackage (commonArgs // {
-          inherit cargoArtifacts;
-        });
+        decide = craneLib.buildPackage ({ inherit cargoArtifacts; } // commonArgs);
+
       in
       {
         checks = {
-          # Build the crate as part of `nix flake check` for convenience
           inherit decide;
 
-          # Run clippy (and deny all warnings) on the crate source,
-          # again, resuing the dependency artifacts from above.
-          #
-          # Note that this is done as a separate derivation so that
-          # we can block the CI if there are issues here, but not
-          # prevent downstream consumers from building our crate by itself.
-          decide-clippy = craneLib.cargoClippy (commonArgs // {
-            inherit cargoArtifacts;
-            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-          });
-
-          decide-doc = craneLib.cargoDoc (commonArgs // {
-            inherit cargoArtifacts;
-          });
-
-          # Check formatting
+          decide-clippy = craneLib.cargoClippy ({ cargoClippyExtraArgs = "--all-targets -- --deny warnings"; inherit cargoArtifacts; } // commonArgs);
+          decide-doc = craneLib.cargoDoc ({ inherit cargoArtifacts; } // commonArgs);
           decide-fmt = craneLib.cargoFmt commonArgs;
-
-          # Audit dependencies
-          decide-audit = craneLib.cargoAudit {
-            inherit src advisory-db;
-          };
-
-          # Audit licenses
+          decide-audit = craneLib.cargoAudit { inherit src advisory-db; };
           decide-deny = craneLib.cargoDeny commonArgs;
-
-          # Run tests with cargo-nextest
-          # Consider setting `doCheck = false` on `decide` if you do not want
-          # the tests to run twice
-          decide-nextest = craneLib.cargoNextest (commonArgs // {
-            inherit cargoArtifacts;
-            partitions = 1;
-            partitionType = "count";
-          });
+          decide-nextest = craneLib.cargoNextest ({ inherit cargoArtifacts; partitions = 1; partitionType = "count"; } // commonArgs);
         };
 
         packages =
@@ -128,52 +74,34 @@
             '';
           in
           {
-            decide-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs // {
-              inherit cargoArtifacts;
-            });
+            decide-llvm-coverage = craneLibLLvmTools.cargoLlvmCov ({ inherit cargoArtifacts; } // commonArgs);
             default = decide;
             client = client;
-          } // (if builtins.match "^.*-linux$" system != null then {
+          } // lib.optionalAttrs (builtins.match "^.*-linux$" system != null) {
             docker = pkgs.dockerTools.buildImage {
               name = "king-decide";
               tag = "latest";
               created = "now";
               runAsRoot = ''
-                #!${pkgs.runtimeShell}
                 mkdir -p /app/data/
                 chown 1000:1000 /app/data/
                 chmod 755 /app/data/
               '';
               config = {
-                Env = [
-                  "PATH=${pkgs.dumb-init}/bin/:${decide}/bin"
-                  "DECIDE_STATIC_PATH=${client}"
-                ];
-                ExposedPorts = {
-                  "8000/tcp" = { };
-                };
+                Env = [ "PATH=${pkgs.dumb-init}/bin/:${decide}/bin" "DECIDE_STATIC_PATH=${client}" ];
+                ExposedPorts = { "8000/tcp" = { }; };
                 User = "1000:1000";
                 Entrypoint = [ "dumb-init" "--" "decide" "0.0.0.0:8000" "sqlite:///app/data/decide.sqlite" ];
               };
             };
+          };
 
-          } else { });
-
-        apps.default = flake-utils.lib.mkApp {
-          drv = decide;
-        };
+        apps.default = flake-utils.lib.mkApp { drv = decide; };
 
         devShells.default = craneLib.devShell {
-          # Inherit inputs from checks.
           checks = self.checks.${system};
-
-          # Additional dev-shell environment variables can be set directly
-          # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
-
-          # Extra inputs can be added here; cargo and rustc are provided by default.
-          packages = [
-            # pkgs.ripgrep
-          ];
+          packages = [ ];
         };
       });
 }
+
