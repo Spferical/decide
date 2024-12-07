@@ -2,7 +2,7 @@
   description = "Build a cargo project";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
 
     crane = {
       url = "github:ipetkov/crane";
@@ -15,6 +15,13 @@
       inputs.rust-analyzer-src.follows = "";
     };
 
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
+
     flake-utils.url = "github:numtide/flake-utils";
 
     advisory-db = {
@@ -23,13 +30,16 @@
     };
   };
 
-  outputs = { self, nixpkgs, crane, fenix, flake-utils, advisory-db, ... }:
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, advisory-db, rust-overlay, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ (import rust-overlay) ];
+        };
         inherit (pkgs) lib;
 
-        craneLib = crane.lib.${system};
+        craneLib = (crane.mkLib pkgs).overrideToolchain pkgs.rust-bin.stable.latest.default;
         src = lib.cleanSourceWith {
           src = craneLib.path ./.;
           filter = path: type: (craneLib.filterCargoSources path type) || (builtins.match ".*/migrations/.*$" path != null);
