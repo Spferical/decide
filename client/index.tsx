@@ -50,7 +50,7 @@ function get_vote_uuid() {
 
 function make_websocket(path: string) {
     const ws_protocol = (window.location.protocol == "https:") ? "wss://" : "ws://";
-    const uri = ws_protocol + location.host + path;
+    const uri = ws_protocol + window.location.host + path;
     return new WebSocket(uri);
 }
 
@@ -548,7 +548,7 @@ class ErrorBoundary extends Component {
             return <Fragment>
                 <main>
                     <p> Oops! Something went wrong. </p>
-                    <p> <a href="javascript:void(0)" onClick={() => location.reload()}>Click here to refresh the page.</a></p>
+                    <p> <a href="javascript:void(0)" onClick={() => window.location.reload()}>Click here to refresh the page.</a></p>
                     <section>
                         <p> {this.state.error.toString()} </p>
                         <details>
