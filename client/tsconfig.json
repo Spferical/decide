@@ -4,6 +4,7 @@
 		"jsx": "preserve",
 		"jsxFactory": "preact.h",
 		"jsxFragmentFactory": "preact.Fragment",
+		"isolatedModules": true,
 		"allowJs": true,
 		"checkJs": true,
 		// "strict": true,
@@ -15,7 +16,7 @@
 		"allowSyntheticDefaultImports": true,
 		"downlevelIteration": true
 	},
-	"include": ["node_modules/wmr/types.d.ts", "**/*"],
+	"include": ["index.tsx"],
 	"typeAcquisition": {
 		"enable": true
 	}

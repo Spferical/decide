@@ -567,6 +567,7 @@ export default function App() {
     return (
         <ErrorBoundary>
             <Router>
+                {/* @ts-ignore */}
                 <Index path="/" />
                 {/* @ts-ignore */}
                 <Rps path="/rps/:room?" />
