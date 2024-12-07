@@ -49,7 +49,7 @@ function get_vote_uuid() {
 }
 
 function make_websocket(path: string) {
-    const ws_protocol = (window.location.protocol == "https:") ? "wss://" : "ws://";
+    const ws_protocol = (window.location.protocol === "https:") ? "wss://" : "ws://";
     const uri = ws_protocol + window.location.host + path;
     return new WebSocket(uri);
 }
@@ -114,7 +114,7 @@ class Rps extends Component<RpsProps, RpsState> {
     }
 
     render(props: RpsProps, state: RpsState) {
-        if (state.room != props.room) {
+        if (state.room !== props.room) {
             state.room = props.room;
             this.ws = make_websocket(`/api/rps/${state.room}`);
             this.ws.onclose = evt => {
@@ -124,9 +124,9 @@ class Rps extends Component<RpsProps, RpsState> {
             };
             this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
         }
-        if (state.status == "connecting") {
+        if (state.status === "connecting") {
             return <footer>Connecting...</footer>;
-        } else if (state.status == "disconnected") {
+        } else if (state.status === "disconnected") {
             return <footer>Disconnected! Try refreshing.</footer>;
         }
 
@@ -196,8 +196,8 @@ function describe_vote(choices: string[], vote: UserVote) {
     let s = `${vote.name}: `;
     for (let j = 0; j < vote.selections.length; j++) {
         let vi = vote.selections[j];
-        if (j != 0) {
-            if (vote.selections[j].rank != vote.selections[j - 1].rank) {
+        if (j !== 0) {
+            if (vote.selections[j].rank !== vote.selections[j - 1].rank) {
                 s += " > ";
             } else {
                 s += " = ";
@@ -280,12 +280,12 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         for (let i = 0; i < props.choices.length; i++) {
             const choice_str = props.choices[state.order[i]];
             const choice_onclick = () => this.onChoiceClick(i);
-            const choice_class = this.state.selected == i ? "choice chosen" : "choice";
+            const choice_class = this.state.selected === i ? "choice chosen" : "choice";
             const ondragstart = () => this.onDragStart(i);
             const ondragenter = () => this.onDragEnter(i);
             const choice = <span role="button" class={choice_class} draggable={true} onClick={choice_onclick} onDragStart={ondragstart} onDragEnter={ondragenter}>{choice_str}</span>;
             choices.push(choice);
-            if (i + 1 != props.choices.length) {
+            if (i + 1 !== props.choices.length) {
                 const rank_onclick = () => this.onRankClick(i);
                 const symbol = this.state.gt[i] ? ">" : "=";
                 let order_elem = <button class="ordering" onClick={rank_onclick}>{symbol}</button>;
@@ -311,7 +311,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
     }
 
     set_selections(items: VoteItem[]) {
-        if (items.length == 0) {
+        if (items.length === 0) {
             return;
         }
         items.sort((a, b) => a.rank - b.rank);
@@ -350,7 +350,7 @@ function VoteResults({ choices, results }: { choices: string[], results: Results
     const totals = results.tally.totals;
     const trows = totals.map((_, i) => {
         const tds = totals[i].map((val, j) => {
-            const symbol = (i == j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : val.toString();
+            const symbol = (i === j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : val.toString();
             /* eslint-disable-next-line react/jsx-key */
             return <td>{symbol}</td>
         });
@@ -431,7 +431,7 @@ class Vote extends Component<VoteProps, VoteState> {
             </Fragment>
         }
 
-        if (state.room != props.room) {
+        if (state.room !== props.room) {
             // The client connected to a new room. Perform initial setup.
             state.room = props.room;
             this.ws = make_websocket(`/api/vote/${state.room}?id=${get_vote_uuid()}`);
@@ -445,11 +445,11 @@ class Vote extends Component<VoteProps, VoteState> {
                 this.setState(new_state)
             };
         }
-        if (state.status == "connecting") {
+        if (state.status === "connecting") {
             return <footer>Connecting...</footer>
-        } else if (state.status == "disconnected") {
+        } else if (state.status === "disconnected") {
             return <footer>Disconnected! Try refreshing.</footer>
-        } else if (state.status == "invalid_room") {
+        } else if (state.status === "invalid_room") {
             route("/vote");
             return <footer>Invalid room!</footer>
         }

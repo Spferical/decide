@@ -1,5 +1,6 @@
 {
   "extends": [
     "react-app"
-  ]
+  ],
+  "rules": {"no-script-url": "off", "jsx-a11y/anchor-is-valid": "off"}
 }
