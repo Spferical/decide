@@ -2,11 +2,10 @@
   description = "Build a cargo project";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
 
     crane = {
       url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     fenix = {
@@ -77,7 +76,7 @@
               pname = "decide-client";
               version = "0.1.0";
               src = ./client;
-              npmDepsHash = "sha256-y6fLhd6LkxN5LzSYrvUG1qZVWSK/xoPaGnNIOm8QkAc=";
+              npmDepsHash = "sha256-+la1zQHgD3IGAQRWqVq/l4WTTpiv/SveDvO1z6VE3rs=";
             };
             client = pkgs.runCommand "copy" { } ''
               cp -r ${clientNpmPackage}/lib/node_modules/decide/dist/ $out/

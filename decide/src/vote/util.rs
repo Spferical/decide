@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rand::distributions::DistString;
+use rand::distr::SampleString;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -38,7 +38,7 @@ pub struct RoomId(pub String);
 
 impl RoomId {
     pub fn new_random() -> Self {
-        Self(rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), 20))
+        Self(rand::distr::Alphanumeric.sample_string(&mut rand::rng(), 20))
     }
 }
 

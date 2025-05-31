@@ -88,7 +88,7 @@ pub fn ranked_pairs(num_choices: usize, votes: Vec<Vec<VoteItem>>) -> CondorcetT
     // Defeats are grouped with all equivalent defeats (by strength/margin).
     for (_key, current_defeats) in defeats
         .into_iter()
-        .group_by(|&(a, b)| (totals[a][b], totals[b][a]))
+        .chunk_by(|&(a, b)| (totals[a][b], totals[b][a]))
         .into_iter()
     {
         // Insert new defeats into the graph.
