@@ -17,8 +17,8 @@ function Index() {
         <main>
             <h2> Decide.pfe.io </h2>
             <p> Welcome to Decide.pfe.io, the easiest way to run a quick and fair ranked vote for a small group! </p>
-            <p><button href="javascript:void(0)" onClick={vote}>🗳️ Start a Vote</button></p>
-            <p><button href="javascript:void(0)" onClick={rps}>🪨📄✂️ Play Rock Paper Scissors</button></p>
+            <p><button onClick={vote}>🗳️ Start a Vote</button></p>
+            <p><button onClick={rps}>🪨📄✂️ Play Rock Paper Scissors</button></p>
             <h4> About </h4>
             <p> Decide.pfe.io is a simple website for running a short ranked vote for a small group. Features include: </p>
             <ul>
@@ -226,101 +226,241 @@ type ChoicesProps = {
 };
 
 type ChoicesState = {
-    order: number[],
-    gt: boolean[],
+    // Sorted from rank 1 (top) to bottom. Stores indices into the candidate array.
+    ranks: number[][],
+    // The currently selected choice, if any.
     selected: number | null,
+    // Choice currently being dragged on a mobile browser. Present only during dragging.
+    draggedChoice: number | null,
+    // Integer row index the choice is currently dragged over.
+    dragTarget: number | null,
+    // Location of the last drag event.
+    dragPos: { x: number, y: number } | null,
 };
 
 class Choices extends Component<ChoicesProps, ChoicesState> {
     constructor(props: ChoicesProps) {
         super();
         this.state = {
-            // Mapping of sorted position -> choice index.
-            order: Array(props.choices.length).fill(null).map((_, i) => i),
-            // true if sorted choice i is > choice i+1, else false if equal.
-            gt: Array(Math.max(0, props.choices.length - 1)).fill(true),
+            ranks: [Array(props.choices.length).fill(null).map((_, i) => i)],
             selected: null,
+            draggedChoice: null,
+            dragTarget: null,
+            dragPos: null,
         };
-        this.set_selections(props.initial_ranks);
+        this.setSelections(props.initial_ranks);
     }
 
-    swap(i: number, j: number) {
-        let order = this.state.order.slice();
-        let tmp = order[j];
-        order[j] = order[i];
-        order[i] = tmp;
-        return { order }
-    }
-
-    onChoiceClick(i: number) {
-        if (this.state.selected == null) {
-            this.setState({ selected: i });
-        } else {
-            this.setState({ ...this.swap(i, this.state.selected), selected: null });
-        }
-    }
-
-    onRankClick(i: number) {
-        let gt = this.state.gt.slice();
-        gt[i] = !gt[i];
-        this.setState({ gt });
-    }
-
-    onDragStart(i: number) {
+    onChoiceClick(i: number, e: MouseEvent) {
+        e.stopPropagation();
         this.setState({ selected: i });
     }
 
-    onDragEnter(i: number) {
-        console.assert(this.state.selected != null);
-        this.setState({ ...this.swap(i, this.state.selected), selected: i });
+    onRowClick(targetRankIndex: number) {
+        if (this.state.selected !== null) {
+            this.moveChoiceToRank(this.state.selected, targetRankIndex);
+            this.setState({ selected: null });
+        }
+    }
+
+    onContextMenu(choiceIndex: number, currentRankIndex: number, e: MouseEvent) {
+        e.preventDefault();
+        this.splitChoiceToNewRank(choiceIndex, currentRankIndex);
+    }
+
+    onChoiceDragStart(choiceIndex: number) {
+        this.setState({ selected: choiceIndex });
+    }
+
+    onChoiceTouchStart(choiceIndex: number, e: TouchEvent) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        this.setState({
+            draggedChoice: choiceIndex,
+            selected: choiceIndex,
+            dragPos: {
+                x: touch.pageX,
+                y: touch.pageY,
+            }
+        });
+    }
+
+    onChoiceTouchMove(choiceIndex: number, e: TouchEvent) {
+        e.preventDefault();
+        if (this.state.draggedChoice === choiceIndex) {
+            const touch = e.touches[0];
+            this.setState({
+                dragPos: {
+                    x: touch.pageX,
+                    y: touch.pageY,
+                }
+            });
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            const row = element?.closest('tr');
+            if (row && row.dataset.rank !== undefined) {
+                const rankIndex = Number(row.dataset.rank);
+                if (rankIndex !== this.state.dragTarget) {
+                    this.setState({ dragTarget: rankIndex });
+                }
+            }
+        }
+    }
+
+    onChoiceTouchEnd(choiceIndex: number, e: TouchEvent) {
+        e.preventDefault();
+        if (this.state.draggedChoice === choiceIndex) {
+            this.finishDrag();
+        }
+    }
+
+    onRowDragOver(e: DragEvent) {
+        e.preventDefault();
+    }
+
+    onRowDrop(e: DragEvent, targetRankIndex: number) {
+        e.preventDefault();
+        if (this.state.selected !== null) {
+            this.moveChoiceToRank(this.state.selected, targetRankIndex);
+            this.setState({ selected: null });
+        }
+    }
+
+    finishDrag() {
+        if (this.state.draggedChoice !== null && this.state.dragTarget !== null) {
+            this.moveChoiceToRank(this.state.draggedChoice, this.state.dragTarget);
+        }
+        this.setState({
+            draggedChoice: null,
+            dragTarget: null,
+            dragPos: null,
+            selected: null,
+        });
+    }
+
+    moveChoiceToRank(choiceIndex: number, targetRankIndex: number) {
+        let currentRankIndex = -1, currentPos = -1;
+        for (let r = 0; r < this.state.ranks.length; r++) {
+            for (let p = 0; p < this.state.ranks[r].length; p++) {
+                if (this.state.ranks[r][p] === choiceIndex) {
+                    currentRankIndex = r;
+                    currentPos = p;
+                    break;
+                }
+            }
+            if (currentRankIndex !== -1) break;
+        }
+        if (currentRankIndex === targetRankIndex) return;
+
+        let ranks = this.state.ranks.map(rank => [...rank]);
+        ranks[currentRankIndex].splice(currentPos, 1);
+        while (ranks.length <= targetRankIndex) ranks.push([]);
+        ranks[targetRankIndex].push(choiceIndex);
+        this.setState({ ranks: ranks.filter(rank => rank.length > 0) });
+    }
+
+    splitChoiceToNewRank(choiceIndex: number, currentRankIndex: number) {
+        let ranks = this.state.ranks.map(rank => [...rank]);
+        ranks[currentRankIndex] = ranks[currentRankIndex].filter(choice => choice !== choiceIndex);
+        ranks.splice(currentRankIndex + 1, 0, [choiceIndex]);
+        this.setState({ ranks: ranks.filter(rank => rank.length > 0) });
     }
 
     render(props: ChoicesProps, state: ChoicesState) {
-        let choices = [];
-        for (let i = 0; i < props.choices.length; i++) {
-            const choice_str = props.choices[state.order[i]];
-            const choice_onclick = () => this.onChoiceClick(i);
-            const choice_class = this.state.selected === i ? "choice chosen" : "choice";
-            const ondragstart = () => this.onDragStart(i);
-            const ondragenter = () => this.onDragEnter(i);
-            const choice = <span role="button" class={choice_class} draggable={true} onClick={choice_onclick} onDragStart={ondragstart} onDragEnter={ondragenter}>{choice_str}</span>;
-            choices.push(choice);
-            if (i + 1 !== props.choices.length) {
-                const rank_onclick = () => this.onRankClick(i);
-                const symbol = this.state.gt[i] ? ">" : "=";
-                let order_elem = <button class="ordering" onClick={rank_onclick}>{symbol}</button>;
-                choices.push(" ");
-                choices.push(order_elem);
-                choices.push(" ");
-            }
+        let tableRows = [];
+        for (let rankIndex = 0; rankIndex < state.ranks.length; rankIndex++) {
+            const choices = state.ranks[rankIndex].map((choiceIndex) => (
+                <span
+                    key={choiceIndex}
+                    role="button"
+                    class={state.selected === choiceIndex ? "choice chosen" : "choice"}
+                    draggable={true}
+                    onClick={(e: MouseEvent) => this.onChoiceClick(choiceIndex, e)}
+                    onContextMenu={(e: MouseEvent) => {
+                        e.preventDefault();
+                        this.splitChoiceToNewRank(choiceIndex, rankIndex);
+                    }}
+                    onDragStart={() => this.onChoiceDragStart(choiceIndex)}
+                    onTouchStart={(e: TouchEvent) => this.onChoiceTouchStart(choiceIndex, e)}
+                    onTouchMove={(e: TouchEvent) => this.onChoiceTouchMove(choiceIndex, e)}
+                    onTouchEnd={(e: TouchEvent) => this.onChoiceTouchEnd(choiceIndex, e)}
+                    style={{
+                        cursor: 'grab',
+                        userSelect: 'none',
+                        touchAction: 'none'
+                    }}
+                >
+                    {props.choices[choiceIndex]}
+                </span>
+            ));
+
+            tableRows.push(
+                <tr
+                    key={`rank-${rankIndex}`}
+                    data-rank={rankIndex}
+                    class={state.dragTarget === rankIndex ? "ballot-row drag-target" : "ballot-row"}
+                    onClick={() => this.onRowClick(rankIndex)}
+                    onDragOver={(e: DragEvent) => this.onRowDragOver(e)}
+                    onDrop={(e: DragEvent) => this.onRowDrop(e, rankIndex)}
+                >
+                    <td class="ballot-rank-cell">Rank {rankIndex + 1}</td>
+                    <td class="ballot-choices-cell">{choices}</td>
+                </tr>
+            );
         }
-        return <div>{choices}</div>;
+
+        tableRows.push(
+            <tr
+                key="empty-row"
+                data-rank={state.ranks.length}
+                class={state.dragTarget === state.ranks.length ? "ballot-row ballot-empty-row drag-target" : "ballot-row ballot-empty-row"}
+                onClick={() => this.onRowClick(state.ranks.length)}
+                onDragOver={(e: DragEvent) => this.onRowDragOver(e)}
+                onDrop={(e: DragEvent) => this.onRowDrop(e, state.ranks.length)}
+            >
+                <td class="ballot-rank-cell">Rank {state.ranks.length + 1}</td>
+                <td class="ballot-empty-cell">Drop choices here to create a new rank</td>
+            </tr>
+        );
+
+        return (
+            <Fragment>
+                <table class="ballot-table">
+                    <tbody>{tableRows}</tbody>
+                </table>
+                {state.dragPos && (
+                    <div
+                        class="drag-overlay"
+                        style={{
+                            left: state.dragPos.x,
+                            top: state.dragPos.y,
+                            pointerEvents: 'none'
+                        }}
+                    >
+                        {props.choices[state.draggedChoice]}
+                    </div>
+                )}
+            </Fragment>
+        );
     }
 
-    get_selections() {
+    getSelections() {
         let items = [];
-        let rank = 0;
-        for (let i = 0; i < this.state.order.length; i++) {
-            let item = this.state.order[i];
-            items.push({ candidate: item, rank });
-            if (this.state.gt[i]) {
-                rank++;
+        for (let rankIndex = 0; rankIndex < this.state.ranks.length; rankIndex++) {
+            for (let choiceIndex of this.state.ranks[rankIndex]) {
+                items.push({ candidate: choiceIndex, rank: rankIndex });
             }
         }
         return items;
     }
 
-    set_selections(items: VoteItem[]) {
-        if (items.length === 0) {
-            return;
+    setSelections(items: VoteItem[]) {
+        if (items.length === 0) return;
+        let ranks: number[][] = [];
+        for (let item of items) {
+            while (ranks.length <= item.rank) ranks.push([]);
+            ranks[item.rank].push(item.candidate);
         }
-        items.sort((a, b) => a.rank - b.rank);
-        let choices = items.map(item => item.candidate);
-        let gt = [];
-        for (let i = 1; i < items.length; i++) {
-            gt.push(items[i].rank > items[i - 1].rank);
-        }
-        this.setState({ order: choices, gt: gt })
+        this.setState({ ranks });
     }
 }
 
@@ -506,7 +646,7 @@ class Vote extends Component<VoteProps, VoteState> {
 
         const ballot_section = (
             <Fragment>
-                <p>Click or drag to edit your ballot.</p>
+                <p>Click or drag to edit your ballot. Rank 1 is best.</p>
                 <Choices ref={this.choices_component} choices={state.vote.choices} initial_ranks={this.initial_vote.selections} />
                 <p>
                     <label for="voter_name">Voter name (optional):</label>

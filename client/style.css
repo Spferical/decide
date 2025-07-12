@@ -4,7 +4,16 @@
     border: 1px solid var(--accent);
     user-select: none;
     cursor: grab;
-    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    touch-action: none;
+}
+
+.choice:active {
+    cursor: grabbing;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .chosen {
@@ -16,6 +25,24 @@
     color: var(--accent);
     background-color: var(--bg);
     border: 1px solid var(--accent);
+}
+
+.drag-overlay {
+    color: var(--bg);
+    background-color: var(--accent);
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    opacity: 0.9;
+    transform: translate(-50%, -50%);
+    position: absolute;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .copyurl {
@@ -31,4 +58,37 @@
     max-width: 100%;
     display: inline-block;
     cursor: pointer;
+}
+
+.ballot-row.drag-target {
+    border: 2px dashed var(--accent);
+}
+
+.ballot-rank-cell {
+    white-space: nowrap
+}
+
+.ballot-choices-cell {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.ballot-empty-row {
+    opacity: 0.3;
+}
+
+.ballot-empty-row.drag-target {
+    opacity: 0.8;
+    border: 2px dashed var(--accent);
+}
+
+.ballot-empty-cell {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    min-height: 2rem;
+    font-style: italic;
 }
