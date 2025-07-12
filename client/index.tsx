@@ -368,6 +368,20 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         }
     }
 
+    onMoveUp(choiceIndex: number, e: MouseEvent) {
+        e.stopPropagation();
+        const currentRank = this.getChoiceRank(choiceIndex);
+        if (currentRank > 0) {
+            this.moveChoiceToRank(choiceIndex, currentRank - 1);
+        }
+    }
+
+    onMoveDown(choiceIndex: number, e: MouseEvent) {
+        e.stopPropagation();
+        const currentRank = this.getChoiceRank(choiceIndex);
+        this.moveChoiceToRank(choiceIndex, currentRank + 1);
+    }
+
     getChoiceRank(choiceIndex: number): number {
         for (let r = 0; r < this.state.ranks.length; r++) {
             if (this.state.ranks[r].includes(choiceIndex)) {
@@ -428,29 +442,46 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         let tableRows = [];
         for (let rankIndex = 0; rankIndex < state.ranks.length; rankIndex++) {
             const choices = state.ranks[rankIndex].map((choiceIndex) => (
-                <span
-                    key={choiceIndex}
-                    data-choice={choiceIndex}
-                    role="button"
-                    tabIndex={0}
-                    class="choice"
-                    draggable={true}
-                    onClick={(e: MouseEvent) => this.onChoiceClick(choiceIndex, e)}
-                    onKeyDown={(e: KeyboardEvent) => this.onKeyDown(choiceIndex, e)}
-                    onContextMenu={(e: MouseEvent) => {
-                        e.preventDefault();
-                        this.splitChoiceToNewRank(choiceIndex, rankIndex);
-                    }}
-                    onTouchStart={(e: TouchEvent) => this.onChoiceTouchStart(choiceIndex, e)}
-                    onTouchMove={(e: TouchEvent) => this.onChoiceTouchMove(choiceIndex, e)}
-                    onTouchEnd={(e: TouchEvent) => this.onChoiceTouchEnd(choiceIndex, e)}
-                    style={{
-                        cursor: 'grab',
-                        userSelect: 'none',
-                        touchAction: 'none'
-                    }}
-                >
-                    {props.choices[choiceIndex]}
+                <span key={choiceIndex} style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    <span
+                        data-choice={choiceIndex}
+                        role="button"
+                        tabIndex={0}
+                        class="choice"
+                        draggable={true}
+                        onClick={(e: MouseEvent) => this.onChoiceClick(choiceIndex, e)}
+                        onKeyDown={(e: KeyboardEvent) => this.onKeyDown(choiceIndex, e)}
+                        onContextMenu={(e: MouseEvent) => {
+                            e.preventDefault();
+                            this.splitChoiceToNewRank(choiceIndex, rankIndex);
+                        }}
+                        onTouchStart={(e: TouchEvent) => this.onChoiceTouchStart(choiceIndex, e)}
+                        onTouchMove={(e: TouchEvent) => this.onChoiceTouchMove(choiceIndex, e)}
+                        onTouchEnd={(e: TouchEvent) => this.onChoiceTouchEnd(choiceIndex, e)}
+                        style={{
+                            cursor: 'grab',
+                            userSelect: 'none',
+                            touchAction: 'none'
+                        }}
+                    >
+                        {props.choices[choiceIndex]}
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                        <button
+                            onClick={(e: MouseEvent) => this.onMoveUp(choiceIndex, e)}
+                            title="Move up"
+                            class="arrow-button"
+                        >
+                            ▲
+                        </button>
+                        <button
+                            onClick={(e: MouseEvent) => this.onMoveDown(choiceIndex, e)}
+                            title="Move down"
+                            class="arrow-button"
+                        >
+                            ▼
+                        </button>
+                    </span>
                 </span>
             ));
 
