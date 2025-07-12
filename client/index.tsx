@@ -16,21 +16,19 @@ function Index() {
     return (
         <main>
             <h2> Decide.pfe.io </h2>
-            <p> Welcome to Decide.pfe.io, the easiest way to run a quick and fair ranked vote for a small group! </p>
+            <p> Welcome to Decide, the quickest way to run a fair ranked vote for a small group! </p>
             <p><button onClick={vote}>🗳️ Start a Vote</button></p>
             <p><button onClick={rps}>🪨📄✂️ Play Rock Paper Scissors</button></p>
             <h4> About </h4>
-            <p> Decide.pfe.io is a simple website for running a short ranked vote for a small group. Features include: </p>
+            <p> Decide.pfe.io is a simple website for running a short ranked vote for a small group. </p>
             <ul>
-                <li> No login required: Anyone with the URL can participate in a poll.</li>
-                <li> Simple and intuitive interface: Just enter the options up for vote and send a link.</li>
-                <li> Quick and easy to use: Finish voting at any time with just one click. </li>
-                <li> Options are shuffled for each voter, eliminating any bias towards the first or last option.</li>
+                <li> No login required. </li>
+                <li> Options are shuffled for each voter to help avoid bias.</li>
                 <li> All data is wiped after 24 hours.</li>
-                <li> Settle ties with the classic rock-paper-scissors game.</li>
+                <li> Rock-paper-scissors is here, too, for tiebreaking. </li>
             </ul >
             <h4> How are votes tallied? </h4>
-            <p> Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet voting ensures that the winning option is the one that beats all other options in head-to-head matchups, making it fair and representative.</p>
+            <p> Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet methods are the only voting methods that guarantee the majority always wins.</p>
             <h4> More Details </h4>
             <p> Decide.pfe.io is free and open source. <a href="https://github.com/Spferical/decide">The source code is available here</a>.</p>
             <p>Please contact me at <a href="mailto: matthew@pfe.io">matthew@pfe.io</a> with any questions or feedback!</p>
