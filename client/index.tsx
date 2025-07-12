@@ -481,6 +481,7 @@ function VoteResults({ choices, results }: { choices: string[], results: Results
     // NOTE: no JSX keys here, vote results are static at the moment.
     /* eslint-disable-next-line react/jsx-key */
     const votes = results.votes.map(v => <li>{describe_vote(choices, v)}</li>);
+    votes.sort();
     /* eslint-disable-next-line react/jsx-key */
     const tchoices = choices.map(c => <th scope="row">{c}</th>);
     /* eslint-disable-next-line react/jsx-key */
