@@ -349,8 +349,8 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();
             const currentRank = this.getChoiceRank(choiceIndex);
-            const targetRank = e.key === 'ArrowUp' ? Math.max(0, currentRank - 1) : currentRank + 1;
-            this.moveChoiceToRank(choiceIndex, targetRank);
+            const targetRank = e.key === 'ArrowUp' ? currentRank - 1 : currentRank + 1;
+            this.moveChoiceToRank(choiceIndex, targetRank, true);
         } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
             e.preventDefault();
             const currentRank = this.getChoiceRank(choiceIndex);
@@ -371,9 +371,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
     onMoveUp(choiceIndex: number, e: MouseEvent) {
         e.stopPropagation();
         const currentRank = this.getChoiceRank(choiceIndex);
-        if (currentRank > 0) {
-            this.moveChoiceToRank(choiceIndex, currentRank - 1);
-        }
+        this.moveChoiceToRank(choiceIndex, currentRank - 1);
     }
 
     onMoveDown(choiceIndex: number, e: MouseEvent) {
@@ -402,7 +400,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         });
     }
 
-    moveChoiceToRank(choiceIndex: number, targetRankIndex: number) {
+    moveChoiceToRank(choiceIndex: number, targetRankIndex: number, keepFocused = false) {
         let currentRankIndex = -1, currentPos = -1;
         for (let r = 0; r < this.state.ranks.length; r++) {
             for (let p = 0; p < this.state.ranks[r].length; p++) {
@@ -419,15 +417,21 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         let ranks = this.state.ranks.map(rank => [...rank]);
         ranks[currentRankIndex].splice(currentPos, 1);
         while (ranks.length <= targetRankIndex) ranks.push([]);
-        ranks[targetRankIndex].push(choiceIndex);
+        if (targetRankIndex === -1) {
+            ranks.unshift([choiceIndex])
+        } else {
+            ranks[targetRankIndex].push(choiceIndex);
+        }
         this.setState({ ranks: ranks.filter(rank => rank.length > 0) }, () => {
-            // Use requestAnimationFrame to ensure DOM is updated
-            requestAnimationFrame(() => {
-                const movedElement = document.querySelector(`[data-choice="${choiceIndex}"]`) as HTMLElement;
-                if (movedElement) {
-                    movedElement.focus();
-                }
-            });
+            if (keepFocused) {
+                // Use requestAnimationFrame to ensure DOM is updated
+                requestAnimationFrame(() => {
+                    const movedElement = document.querySelector(`[data-choice="${choiceIndex}"]`) as HTMLElement;
+                    if (movedElement) {
+                        movedElement.focus();
+                    }
+                });
+            }
         });
     }
 
