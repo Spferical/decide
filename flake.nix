@@ -109,7 +109,7 @@
 
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
-          packages = [ ];
+          packages = with pkgs; [ sqlx-cli ];
         };
       });
 }
