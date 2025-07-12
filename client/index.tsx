@@ -15,24 +15,24 @@ function Index() {
     document.title = "Decide.pfe.io";
     return (
         <main>
-            <h2> Decide.pfe.io </h2>
-            <p> Welcome to Decide, the quickest way to run a fair ranked vote for a small group! </p>
+            <h1>Decide.pfe.io</h1>
+            <p>Welcome to Decide, the quickest way to run a fair ranked vote for a small group!</p>
             <p><button onClick={vote}>🗳️ Start a Vote</button></p>
             <p><button onClick={rps}>🪨📄✂️ Play Rock Paper Scissors</button></p>
-            <h4> About </h4>
-            <p> Decide.pfe.io is a simple website for running a short ranked vote for a small group. </p>
+            <h2>About</h2>
+            <p>Decide.pfe.io is a simple website for running a short ranked vote for a small group.</p>
             <ul>
-                <li> No login required. </li>
-                <li> Options are shuffled for each voter to help avoid bias.</li>
-                <li> All data is wiped after 24 hours.</li>
-                <li> Rock-paper-scissors is here, too, for tiebreaking. </li>
-            </ul >
-            <h4> How are votes tallied? </h4>
-            <p> Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet methods are the only voting methods that guarantee the majority always wins.</p>
-            <h4> More Details </h4>
-            <p> Decide.pfe.io is free and open source. <a href="https://github.com/Spferical/decide">The source code is available here</a>.</p>
-            <p>Please contact me at <a href="mailto: matthew@pfe.io">matthew@pfe.io</a> with any questions or feedback!</p>
-        </main >
+                <li>No login.</li>
+                <li>Candidates are shuffled for each voter to help avoid bias.</li>
+                <li>All data is wiped after 24 hours.</li>
+                <li>Rock-paper-scissors is here, too, for tiebreaking.</li>
+            </ul>
+            <h2>How are votes tallied?</h2>
+            <p>Decide.pfe.io uses a <a href="https://en.wikipedia.org/wiki/Condorcet_method">Condorcet method</a>, specifically <a href="https://en.wikipedia.org/wiki/Ranked_pairs">ranked pairs</a>, to calculate the winner of each election. Condorcet methods are the only voting methods that guarantee the majority wins.</p>
+            <h2>More Details</h2>
+            <p>Decide.pfe.io is free and open source. <a href="https://github.com/Spferical/decide">The source code is available here</a>.</p>
+            <p>Please contact me at <a href="mailto:matthew@pfe.io">matthew@pfe.io</a> with any questions or feedback!</p>
+        </main>
     )
 }
 
@@ -88,12 +88,21 @@ type RpsState = {
 function CopyLink() {
     const initial_text = "<-- Click to copy!";
     const [infoText, setText] = useState(initial_text);
+    const doCopy = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setText("<-- Copied!");
+        setTimeout(() => setText(initial_text), 1000);
+    };
     return <Fragment>
-        <span class="copyurl" onClick={e => {
-            navigator.clipboard.writeText(window.location.href);
-            setText("<-- Copied!");
-            setTimeout(() => setText(initial_text), 1000);
-        }}>{window.location.href}</span> {infoText}
+        <span
+            class="copyurl"
+            onClick={e => doCopy()}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { doCopy() } }}
+            role="button"
+            tabIndex={0}
+        >
+            {window.location.href}
+        </span> {infoText}
     </Fragment>;
 }
 
@@ -123,9 +132,9 @@ class Rps extends Component<RpsProps, RpsState> {
             this.ws.onmessage = msg => this.setState(JSON.parse(msg.data));
         }
         if (state.status === "connecting") {
-            return <footer>Connecting...</footer>;
+            return <footer role="status">Connecting...</footer>;
         } else if (state.status === "disconnected") {
-            return <footer>Disconnected! Try refreshing.</footer>;
+            return <footer role="status">Disconnected! Try refreshing.</footer>;
         }
 
         console.assert(state.room_state != null);
@@ -146,11 +155,11 @@ class Rps extends Component<RpsProps, RpsState> {
                 if (is_player) {
                     item = `${player_view.outcome_history[i]}: ${item}`;
                 }
-                items.push(<li>{item}</li>)
+                items.push(<li key={i}>{item}</li>)
             }
             history_component = (
                 <div>
-                    History:
+                    <h3>History:</h3>
                     <ol>{items}</ol>
                 </div>
             );
@@ -160,7 +169,7 @@ class Rps extends Component<RpsProps, RpsState> {
             <Fragment>
                 <main>
                     {is_player && <div>
-                        {(state.room_state.num_players < 2) && <p class="notice">
+                        {(state.room_state.num_players < 2) && <p class="notice" role="status">
                             Send this URL to your opponent to connect.<br /> <CopyLink />
                         </p>}
                         <p>
@@ -170,20 +179,20 @@ class Rps extends Component<RpsProps, RpsState> {
                             {" "}
                             <button onClick={get_onclick("scissors")}>scissors</button>
                         </p>
-                        {player_view.choice && <p>You have selected: {player_view.choice}.</p>}
+                        {player_view.choice && <p role="status">You have selected: {player_view.choice}.</p>}
                         {state.room_state.num_players >= 2 &&
-                            <p>{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</p>}
+                            <p role="status">{player_view.opponent_chosen ? "Opponent has selected a choice." : "Waiting for opponent to select..."}</p>}
                         {!!(player_view.wins || player_view.losses || player_view.draws) &&
-                            <div>Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>}
+                            <div role="status">Wins: {player_view.wins} Losses: {player_view.losses} Draws: {player_view.draws}</div>}
                     </div>}
                     {!!spectator_view && !!(spectator_view.player_wins || spectator_view.draws) &&
-                        <div> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>
+                        <div role="status"> Wins: {spectator_view.player_wins.join(" vs ")} Draws: {spectator_view.draws}</div>
                     }
                     {history_component}
                 </main>
                 <footer>
-                    <div>There are {state.room_state.num_players} players and {state.room_state.num_spectators} spectators.</div>
-                    <div>{is_player ? "You are a player!" : "You are a spectator!"}</div>
+                    <div role="status">There are {state.room_state.num_players} players and {state.room_state.num_spectators} spectators.</div>
+                    <div role="status">{is_player ? "You are a player!" : "You are a spectator!"}</div>
                 </footer>
             </Fragment>
         );
@@ -226,8 +235,6 @@ type ChoicesProps = {
 type ChoicesState = {
     // Sorted from rank 1 (top) to bottom. Stores indices into the candidate array.
     ranks: number[][],
-    // The currently selected choice, if any.
-    selected: number | null,
     // Choice currently being dragged on a mobile browser. Present only during dragging.
     draggedChoice: number | null,
     // Integer row index the choice is currently dragged over.
@@ -241,7 +248,6 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         super();
         this.state = {
             ranks: [Array(props.choices.length).fill(null).map((_, i) => i)],
-            selected: null,
             draggedChoice: null,
             dragTarget: null,
             dragPos: null,
@@ -251,13 +257,17 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
 
     onChoiceClick(i: number, e: MouseEvent) {
         e.stopPropagation();
-        this.setState({ selected: i });
+        // Focus the clicked element instead of setting state
+        const element = e.currentTarget as HTMLElement;
+        element.focus();
     }
 
     onRowClick(targetRankIndex: number) {
-        if (this.state.selected !== null) {
-            this.moveChoiceToRank(this.state.selected, targetRankIndex);
-            this.setState({ selected: null });
+        // Get the currently focused choice element
+        const focusedElement = document.activeElement as HTMLElement;
+        if (focusedElement && focusedElement.hasAttribute('data-choice')) {
+            const choiceIndex = parseInt(focusedElement.getAttribute('data-choice')!);
+            this.moveChoiceToRank(choiceIndex, targetRankIndex);
         }
     }
 
@@ -266,21 +276,18 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         this.splitChoiceToNewRank(choiceIndex, currentRankIndex);
     }
 
-    onChoiceDragStart(choiceIndex: number) {
-        this.setState({ selected: choiceIndex });
-    }
-
     onChoiceTouchStart(choiceIndex: number, e: TouchEvent) {
         e.preventDefault();
         const touch = e.touches[0];
         this.setState({
             draggedChoice: choiceIndex,
-            selected: choiceIndex,
             dragPos: {
                 x: touch.pageX,
                 y: touch.pageY,
             }
         });
+        const element = e.currentTarget as HTMLElement;
+        element.focus();
     }
 
     onChoiceTouchMove(choiceIndex: number, e: TouchEvent) {
@@ -317,10 +324,57 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
 
     onRowDrop(e: DragEvent, targetRankIndex: number) {
         e.preventDefault();
-        if (this.state.selected !== null) {
-            this.moveChoiceToRank(this.state.selected, targetRankIndex);
-            this.setState({ selected: null });
+        const focusedElement = document.activeElement as HTMLElement;
+        if (focusedElement && focusedElement.hasAttribute('data-choice')) {
+            const choiceIndex = parseInt(focusedElement.getAttribute('data-choice')!);
+            this.moveChoiceToRank(choiceIndex, targetRankIndex);
         }
+    }
+
+    onRowMouseDown(e: MouseEvent) {
+        console.log(e);
+        if (e.target instanceof HTMLElement) {
+            if (!e.target.dataset.choice) {
+                // Prevent focusing <body> when clicking a row.
+                // This may keep a choice button focused for the click handler.
+                e.preventDefault();
+            }
+        }
+    }
+
+    onKeyDown(choiceIndex: number, e: KeyboardEvent) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.onChoiceClick(choiceIndex, e as any);
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const currentRank = this.getChoiceRank(choiceIndex);
+            const targetRank = e.key === 'ArrowUp' ? Math.max(0, currentRank - 1) : currentRank + 1;
+            this.moveChoiceToRank(choiceIndex, targetRank);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const currentRank = this.getChoiceRank(choiceIndex);
+            const choicesInRank = this.state.ranks[currentRank];
+            const currentIndex = choicesInRank.indexOf(choiceIndex);
+            if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                const prevChoice = choicesInRank[currentIndex - 1];
+                const prevElement = document.querySelector(`[data-choice="${prevChoice}"]`) as HTMLElement;
+                if (prevElement) prevElement.focus();
+            } else if (e.key === 'ArrowRight' && currentIndex < choicesInRank.length - 1) {
+                const nextChoice = choicesInRank[currentIndex + 1];
+                const nextElement = document.querySelector(`[data-choice="${nextChoice}"]`) as HTMLElement;
+                if (nextElement) nextElement.focus();
+            }
+        }
+    }
+
+    getChoiceRank(choiceIndex: number): number {
+        for (let r = 0; r < this.state.ranks.length; r++) {
+            if (this.state.ranks[r].includes(choiceIndex)) {
+                return r;
+            }
+        }
+        return -1;
     }
 
     finishDrag() {
@@ -331,7 +385,6 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
             draggedChoice: null,
             dragTarget: null,
             dragPos: null,
-            selected: null,
         });
     }
 
@@ -353,7 +406,15 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         ranks[currentRankIndex].splice(currentPos, 1);
         while (ranks.length <= targetRankIndex) ranks.push([]);
         ranks[targetRankIndex].push(choiceIndex);
-        this.setState({ ranks: ranks.filter(rank => rank.length > 0) });
+        this.setState({ ranks: ranks.filter(rank => rank.length > 0) }, () => {
+            // Use requestAnimationFrame to ensure DOM is updated
+            requestAnimationFrame(() => {
+                const movedElement = document.querySelector(`[data-choice="${choiceIndex}"]`) as HTMLElement;
+                if (movedElement) {
+                    movedElement.focus();
+                }
+            });
+        });
     }
 
     splitChoiceToNewRank(choiceIndex: number, currentRankIndex: number) {
@@ -369,15 +430,17 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
             const choices = state.ranks[rankIndex].map((choiceIndex) => (
                 <span
                     key={choiceIndex}
+                    data-choice={choiceIndex}
                     role="button"
-                    class={state.selected === choiceIndex ? "choice chosen" : "choice"}
+                    tabIndex={0}
+                    class="choice"
                     draggable={true}
                     onClick={(e: MouseEvent) => this.onChoiceClick(choiceIndex, e)}
+                    onKeyDown={(e: KeyboardEvent) => this.onKeyDown(choiceIndex, e)}
                     onContextMenu={(e: MouseEvent) => {
                         e.preventDefault();
                         this.splitChoiceToNewRank(choiceIndex, rankIndex);
                     }}
-                    onDragStart={() => this.onChoiceDragStart(choiceIndex)}
                     onTouchStart={(e: TouchEvent) => this.onChoiceTouchStart(choiceIndex, e)}
                     onTouchMove={(e: TouchEvent) => this.onChoiceTouchMove(choiceIndex, e)}
                     onTouchEnd={(e: TouchEvent) => this.onChoiceTouchEnd(choiceIndex, e)}
@@ -396,9 +459,16 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
                     key={`rank-${rankIndex}`}
                     data-rank={rankIndex}
                     class={state.dragTarget === rankIndex ? "ballot-row drag-target" : "ballot-row"}
-                    onClick={() => this.onRowClick(rankIndex)}
+                    onMouseDown={this.onRowMouseDown}
+                    onClick={(e) => this.onRowClick(rankIndex)}
                     onDragOver={(e: DragEvent) => this.onRowDragOver(e)}
                     onDrop={(e: DragEvent) => this.onRowDrop(e, rankIndex)}
+                    onKeyDown={(e: KeyboardEvent) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            this.onRowClick(rankIndex);
+                        }
+                    }}
                 >
                     <td class="ballot-rank-cell">Rank {rankIndex + 1}</td>
                     <td class="ballot-choices-cell">{choices}</td>
@@ -411,9 +481,16 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
                 key="empty-row"
                 data-rank={state.ranks.length}
                 class={state.dragTarget === state.ranks.length ? "ballot-row ballot-empty-row drag-target" : "ballot-row ballot-empty-row"}
+                onMouseDown={this.onRowMouseDown}
                 onClick={() => this.onRowClick(state.ranks.length)}
                 onDragOver={(e: DragEvent) => this.onRowDragOver(e)}
                 onDrop={(e: DragEvent) => this.onRowDrop(e, state.ranks.length)}
+                onKeyDown={(e: KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.onRowClick(state.ranks.length);
+                    }
+                }}
             >
                 <td class="ballot-rank-cell">Rank {state.ranks.length + 1}</td>
                 <td class="ballot-empty-cell">Drop choices here to create a new rank</td>
@@ -422,7 +499,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
 
         return (
             <Fragment>
-                <table class="ballot-table">
+                <table class="ballot-table" role="grid" aria-label="Ballot">
                     <tbody>{tableRows}</tbody>
                 </table>
                 {state.dragPos && (
@@ -433,6 +510,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
                             top: state.dragPos.y,
                             pointerEvents: 'none'
                         }}
+                        aria-hidden="true"
                     >
                         {props.choices[state.draggedChoice]}
                     </div>
@@ -478,41 +556,36 @@ type Results = {
 }
 
 function VoteResults({ choices, results }: { choices: string[], results: Results }) {
-    // NOTE: no JSX keys here, vote results are static at the moment.
-    /* eslint-disable-next-line react/jsx-key */
-    const votes = results.votes.map(v => <li>{describe_vote(choices, v)}</li>);
+    const votes = results.votes.map((v, i) => <li key={i}>{describe_vote(choices, v)}</li>);
     votes.sort();
-    /* eslint-disable-next-line react/jsx-key */
-    const tchoices = choices.map(c => <th scope="row">{c}</th>);
-    /* eslint-disable-next-line react/jsx-key */
+    const tchoices = choices.map((c, i) => <th key={i} scope="row">{c}</th>);
     const thead = <thead><tr><th key="head" scope="col" />{tchoices}</tr></thead>;
     const totals = results.tally.totals;
     const trows = totals.map((_, i) => {
         const tds = totals[i].map((val, j) => {
             const symbol = (i === j) ? "-" : (val > totals[j][i]) ? <mark>{val}</mark> : val.toString();
-            /* eslint-disable-next-line react/jsx-key */
-            return <td>{symbol}</td>
+            return <td key={j}>{symbol}</td>
         });
-        /* eslint-disable-next-line react/jsx-key */
-        return <tr><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
+        return <tr key={i}><th key="head" scope="row">{choices[i]}</th>{tds}</tr>
     });
     const ranks = results.tally.ranks.map(
-        /* eslint-disable-next-line react/jsx-key */
-        rank => <li>{rank.map(c => choices[c]).join(" AND ")}</li>
+        (rank, i) => <li key={i}>{rank.map(c => choices[c]).join(" AND ")}</li>
     );
     const winners = (results.tally.ranks[0] || []).map(i => choices[i]);
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
-        <header>The results are in! The {winner_desc}: <strong>{winners.join(" AND ")}</strong></header>
+        <header role="banner">
+            <h2>The results are in! The {winner_desc}: <strong>{winners.join(" AND ")}</strong></h2>
+        </header>
         <details>
             <summary>See detailed results</summary>
-            <p> The votes are: </p>
+            <p>The votes are:</p>
             <ul>
                 {votes}
             </ul>
-            <table role="grid">
+            <table role="grid" aria-label="Vote comparison matrix">
                 {thead}
-                {trows}
+                <tbody>{trows}</tbody>
             </table>
             <p>The full ranks are:</p>
             <ol>
@@ -520,7 +593,6 @@ function VoteResults({ choices, results }: { choices: string[], results: Results
             </ol>
         </details>
     </article>
-
 }
 
 type VoteProps = {
@@ -561,12 +633,14 @@ class Vote extends Component<VoteProps, VoteState> {
     render(props: VoteProps, state: VoteState) {
         if (!props.room) {
             return <Fragment>
-                <h2>Start a Vote</h2>
-                <form action="/api/start_vote" method="post">
-                    <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
-                    <p><textarea name="choices" /></p>
-                    <input type="submit" value="Start Vote" />
-                </form>
+                <main>
+                    <h1>Start a Vote</h1>
+                    <form action="/api/start_vote" method="post">
+                        <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
+                        <p><textarea name="choices" id="choices" required aria-required="true" /></p>
+                        <input type="submit" value="Start Vote" />
+                    </form>
+                </main>
             </Fragment>
         }
 
@@ -585,12 +659,12 @@ class Vote extends Component<VoteProps, VoteState> {
             };
         }
         if (state.status === "connecting") {
-            return <footer>Connecting...</footer>
+            return <footer role="status">Connecting...</footer>
         } else if (state.status === "disconnected") {
-            return <footer>Disconnected! Try refreshing.</footer>
+            return <footer role="status">Disconnected! Try refreshing.</footer>
         } else if (state.status === "invalid_room") {
             route("/vote");
-            return <footer>Invalid room!</footer>
+            return <footer role="status">Invalid room!</footer>
         }
 
         console.assert(state.vote != null);
@@ -602,12 +676,12 @@ class Vote extends Component<VoteProps, VoteState> {
         let submitted_section = null;
         if (state.vote.your_vote) {
             let description = describe_vote(state.vote.choices, state.vote.your_vote);
-            submitted_section = <p>You submitted: {description}</p>;
+            submitted_section = <p role="status">You submitted: {description}</p>;
         }
 
         const submit = () => {
             const choices_component = this.choices_component.current;
-            let items = choices_component.get_selections();
+            let items = choices_component.getSelections();
             this.ws.send(JSON.stringify({ vote: { name: this.state.voter_name, selections: items } }))
         };
 
@@ -620,10 +694,7 @@ class Vote extends Component<VoteProps, VoteState> {
 
         const submit_text = (state.vote.your_vote) ? "Resubmit Your Vote" : "Submit Your Vote";
 
-        // initial_vote is false until the first render with server-provided room state.
         if (!this.initial_vote) {
-            // If this is a new tab from an existing user, adjust the UI
-            // to match the last submitted vote.
             let vote = state.vote.your_vote;
             if (vote) {
                 this.initial_vote = vote;
@@ -645,11 +716,13 @@ class Vote extends Component<VoteProps, VoteState> {
 
         const ballot_section = (
             <Fragment>
-                <p>Click or drag to edit your ballot. Rank 1 is best.</p>
-                <Choices ref={this.choices_component} choices={state.vote.choices} initial_ranks={this.initial_vote.selections} />
+                <p>Click or drag or use tab/arrow keys to edit your ballot. Rank 1 is best.</p>
+                <div role="region" aria-label="Voting ballot">
+                    <Choices ref={this.choices_component} choices={state.vote.choices} initial_ranks={this.initial_vote.selections} />
+                </div>
                 <p>
                     <label for="voter_name">Voter name (optional):</label>
-                    <input value={state.voter_name} onInput={on_input} />
+                    <input id="voter_name" value={state.voter_name} onInput={on_input} />
                 </p>
                 <p><button onClick={submit}>{submit_text}</button></p>
             </Fragment>
@@ -658,11 +731,11 @@ class Vote extends Component<VoteProps, VoteState> {
         return (
             <Fragment>
                 <main>
-                    {state.vote.num_players <= 1 && <p class="notice"> Send this URL to all voters:<br /><CopyLink /> </p>}
+                    {state.vote.num_players <= 1 && <p class="notice" role="status"> Send this URL to all voters:<br /><CopyLink /> </p>}
                     {!state.vote.results && ballot_section}
                     {submitted_section}
                     {!state.vote.results && <p><button onClick={tally}>End Voting and Show the Results</button></p>}
-                    <p>{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
+                    <p role="status">{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
                     {results}
                 </main>
                 <footer>
@@ -686,13 +759,18 @@ class ErrorBoundary extends Component {
         if (this.state.error) {
             return <Fragment>
                 <main>
-                    <p> Oops! Something went wrong. </p>
-                    <p> <a href="javascript:void(0)" onClick={() => window.location.reload()}>Click here to refresh the page.</a></p>
+                    <h1>Error</h1>
+                    <p role="alert">Oops! Something went wrong.</p>
+                    <p><a href="javascript:void(0)" onClick={() => window.location.reload()}>Click here to refresh the page.</a></p>
                     <section>
-                        <p> {this.state.error.toString()} </p>
+                        <p>Error details:</p>
                         <details>
-                            <summary> Extra details: </summary>
-                            <pre>{this.state.error.stack}</pre>
+                            <summary>Extra details</summary>
+                            <pre>{this.state.error.toString()}</pre>
+                            <details>
+                                <summary>Stack trace</summary>
+                                <pre>{this.state.error.stack}</pre>
+                            </details>
                         </details>
                     </section>
                 </main>
