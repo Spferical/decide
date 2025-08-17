@@ -132,11 +132,4 @@ impl Db {
             .await
             .expect("Failed to update room last active");
     }
-
-    pub async fn cleanup_rooms(&self) {
-        sqlx::query("DELETE FROM room WHERE last_active < datetime('now','-1 day')")
-            .execute(&self.db_pool)
-            .await
-            .expect("Failed to delete rooms");
-    }
 }

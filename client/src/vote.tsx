@@ -570,7 +570,6 @@ export class Vote extends Component<VoteProps, VoteState> {
                     {results}
                 </main>
                 <footer>
-                    <p>This election will be <strong>deleted</strong> after 24 hours of inactivity.</p>
                     <p><a href="/vote">Click here to create a new election.</a></p>
                 </footer>
             </Fragment>

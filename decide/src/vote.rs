@@ -238,15 +238,6 @@ impl VoteState {
             self.rooms.remove(room_id);
         }
     }
-
-    async fn cleanup_rooms(&mut self) {
-        let start = Instant::now();
-        for room_id in self.rooms.keys() {
-            self.db.bump_room_activity(room_id).await;
-        }
-        self.db.cleanup_rooms().await;
-        log::info!("Cleaned rooms in {:?}", Instant::now() - start);
-    }
 }
 
 async fn start_vote(state: Arc<Mutex<VoteState>>, form: api::NewVoteForm) -> WebResult<impl Reply> {
@@ -390,21 +381,11 @@ async fn handle_vote_client(
     }
 }
 
-// Background task that cleans up old rooms.
-async fn run_cleanup_task(global_state: Arc<Mutex<VoteState>>) {
-    loop {
-        tokio::time::sleep(CLEANUP_INTERVAL).await;
-        let mut gs = global_state.lock().await;
-        gs.cleanup_rooms().await;
-    }
-}
-
 #[allow(opaque_hidden_inferred_bound)]
 pub async fn routes(
     db_url: &str,
 ) -> impl warp::Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     let vote_state = Arc::new(Mutex::new(VoteState::init(db_url).await.unwrap()));
-    tokio::spawn(run_cleanup_task(vote_state.clone()));
     let with_vote_state = warp::any().map(move || vote_state.clone());
     let new_vote_route = warp::path!("api" / "start_vote")
         .and(warp::post())

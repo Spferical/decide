@@ -25,7 +25,6 @@ function Index() {
             <ul>
                 <li>No login.</li>
                 <li>Candidates are shuffled for each voter to help avoid bias.</li>
-                <li>All data is wiped after 24 hours.</li>
                 <li>Rock-paper-scissors is here, too, for tiebreaking.</li>
             </ul>
             <h2>How are votes tallied?</h2>
