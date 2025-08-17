@@ -9,7 +9,7 @@
 		"start": "vite",
 		"build": "vite build",
 		"serve": "vite preview",
-		"lint": "eslint *.tsx"
+		"lint": "eslint src/*.tsx"
 	},
 	"eslintConfig": {
 		"extends": "preact"

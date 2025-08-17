@@ -16,7 +16,7 @@
 		"allowSyntheticDefaultImports": true,
 		"downlevelIteration": true
 	},
-	"include": ["index.tsx"],
+	"include": ["./src/index.tsx"],
 	"typeAcquisition": {
 		"enable": true
 	}
