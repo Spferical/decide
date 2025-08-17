@@ -239,7 +239,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         } else {
             ranks[targetRankIndex].push(choiceIndex);
         }
-        this.setState({ ranks: ranks.filter(rank => rank.length > 0) }, () => {
+        this.setState({ ranks }, () => {
             if (keepFocused) {
                 // Use requestAnimationFrame to ensure DOM is updated
                 requestAnimationFrame(() => {
@@ -256,7 +256,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
         let ranks = this.state.ranks.map(rank => [...rank]);
         ranks[currentRankIndex] = ranks[currentRankIndex].filter(choice => choice !== choiceIndex);
         ranks.splice(currentRankIndex + 1, 0, [choiceIndex]);
-        this.setState({ ranks: ranks.filter(rank => rank.length > 0) });
+        this.setState({ ranks });
     }
 
     render(props: ChoicesProps, state: ChoicesState) {
@@ -327,27 +327,6 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
                 </tr>
             );
         }
-
-        tableRows.push(
-            <tr
-                key="empty-row"
-                data-rank={state.ranks.length}
-                class={state.dragTarget === state.ranks.length ? "ballot-row ballot-empty-row drag-target" : "ballot-row ballot-empty-row"}
-                onMouseDown={this.onRowMouseDown}
-                onClick={() => this.onRowClick(state.ranks.length)}
-                onDragOver={(e: DragEvent) => this.onRowDragOver(e)}
-                onDrop={(e: DragEvent) => this.onRowDrop(e, state.ranks.length)}
-                onKeyDown={(e: KeyboardEvent) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.onRowClick(state.ranks.length);
-                    }
-                }}
-            >
-                <td class="ballot-rank-cell">Rank {state.ranks.length + 1}</td>
-                <td class="ballot-empty-cell">Drop choices here to create a new rank</td>
-            </tr>
-        );
 
         return (
             <Fragment>

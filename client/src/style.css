@@ -70,17 +70,20 @@
     cursor: pointer;
 }
 
+.ballot-table {
+    table-layout: fixed;
+}
+
 .ballot-row.drag-target {
     border: 2px dashed var(--accent);
 }
 
 .ballot-rank-cell {
-    white-space: nowrap
+    white-space: nowrap;
 }
 
 .ballot-choices-cell {
-    display: flex;
-    flex-wrap: wrap;
+    word-wrap: break-word;
 }
 
 .ballot-empty-row {
