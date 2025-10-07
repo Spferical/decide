@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use api::VoteWebsocketQueryParams;
 use futures_util::{SinkExt, StreamExt};
@@ -26,9 +22,6 @@ use self::{
 
 pub(crate) mod db;
 pub(crate) mod util;
-
-/// Interval at which inactive rooms are deleted.
-const CLEANUP_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
 /// State for a room stored in process memory.
 /// All room changes are synchronized with a mutable reference to this struct.
@@ -298,7 +291,7 @@ async fn handle_vote_client(
     };
     log::debug!("client {client_id} connected to room {room_id}");
     let on_command = |global_state: Arc<Mutex<VoteState>>, room_id, client_id, command| async move {
-        log::debug!("client {client_id} sent command: {:?}", command);
+        log::debug!("client {client_id} sent command: {command:?}");
         match command {
             api::Command::Vote(user_vote) => {
                 let mut gs = global_state.lock().await;
@@ -319,9 +312,9 @@ async fn handle_vote_client(
                         let msg_ref = borrowed_msg.as_ref().expect("Bad state broadcast");
                         serde_json::to_string(msg_ref).unwrap()
                     };
-                    log::debug!("Sending message: {:?}", serialized_msg);
+                    log::debug!("Sending message: {serialized_msg:?}");
                     if let Err(err) = ws.send(Message::text(serialized_msg)).await {
-                        log::debug!("Error sending message to client: {}", err);
+                        log::debug!("Error sending message to client: {err}");
                         break
                     }
                 },
@@ -330,7 +323,7 @@ async fn handle_vote_client(
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
-                    log::debug!("Got message: {:?}", msg);
+                    log::debug!("Got message: {msg:?}");
                     #[allow(clippy::if_same_then_else)]
                     if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
                         break
@@ -355,17 +348,17 @@ async fn handle_vote_client(
                                 log::info!("{client_id} {command_name} {elapsed:?}");
                             },
                             Err(e) => {
-                                log::debug!("Bad message: {:?}: {:?}", msg, e);
+                                log::debug!("Bad message: {msg:?}: {e:?}");
                                 continue;
                             },
                         }
                         Err(()) => {
-                            log::debug!("Bad message: {:?}", msg);
+                            log::debug!("Bad message: {msg:?}");
                         },
                     }
                 },
                 Some(Err(err)) => {
-                    log::debug!("Error reading client response: {}", err);
+                    log::debug!("Error reading client response: {err}");
                     break
                 },
                 None => break,

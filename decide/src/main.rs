@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = match addr.parse::<SocketAddr>() {
         Ok(addr) => addr,
         Err(e) => {
-            return Err(format!("Invalid URL: {}: {}", addr, e).into());
+            return Err(format!("Invalid URL: {addr}: {e}").into());
         }
     };
     let static_path = std::env::var("DECIDE_STATIC_PATH").unwrap_or("static".into());

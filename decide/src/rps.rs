@@ -269,7 +269,7 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
                         serde_json::to_string(borrowed_msg.as_ref().unwrap()).unwrap()
                     };
                     if let Err(err) = ws.send(Message::text(serialized_msg)).await {
-                        log::debug!("Error sending message to client: {}", err);
+                        log::debug!("Error sending message to client: {err}");
                         break
                     }
                 },
@@ -278,7 +278,7 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
             },
             item = ws.next() => match item {
                 Some(Ok(msg)) => {
-                    log::debug!("Got message: {:?}", msg);
+                    log::debug!("Got message: {msg:?}");
                     if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
                         break;
                     }
@@ -294,17 +294,17 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
                                 .await;
                             },
                             Err(e) => {
-                                log::debug!("Bad message: {:?}: {:?}", msg, e);
+                                log::debug!("Bad message: {msg:?}: {e:?}");
                                 continue;
                             },
                         }
                         Err(()) => {
-                            log::debug!("Bad message: {:?}", msg);
+                            log::debug!("Bad message: {msg:?}");
                         },
                     }
                 },
                 Some(Err(err)) => {
-                    log::debug!("Error reading client response: {}", err);
+                    log::debug!("Error reading client response: {err}");
                     break
                 },
                 None => {
