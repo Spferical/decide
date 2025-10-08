@@ -6,49 +6,18 @@ use sqlx::{
     Row,
 };
 
-use decide_api as api;
-
 use super::util::{ClientId, RoomId};
 
-#[derive(Serialize, Deserialize)]
-struct DbRoomStateV1 {
-    choices: Vec<String>,
-    votes: HashMap<ClientId, api::UserVote>,
-    tallied: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-enum DbRoomState {
-    V1(DbRoomStateV1),
-}
-
-#[derive(Clone)]
-pub(crate) struct DbRoom {
+#[derive(Clone, Serialize, Deserialize)]
+pub struct RoomV1 {
     pub choices: Vec<String>,
-    pub votes: HashMap<ClientId, api::UserVote>,
+    pub votes: HashMap<ClientId, decide_api::UserVote>,
     pub tallied: bool,
 }
 
-impl From<DbRoomState> for DbRoom {
-    fn from(db_room_state: DbRoomState) -> Self {
-        match db_room_state {
-            DbRoomState::V1(v1) => Self {
-                choices: v1.choices,
-                votes: v1.votes,
-                tallied: v1.tallied,
-            },
-        }
-    }
-}
-
-impl From<DbRoom> for DbRoomState {
-    fn from(persistent_room_state: DbRoom) -> Self {
-        Self::V1(DbRoomStateV1 {
-            choices: persistent_room_state.choices,
-            votes: persistent_room_state.votes,
-            tallied: persistent_room_state.tallied,
-        })
-    }
+#[derive(Clone, Serialize, Deserialize)]
+pub enum Room {
+    V1(RoomV1),
 }
 
 /*
@@ -78,7 +47,7 @@ impl Db {
 
     pub async fn create_room(&self, choices: Vec<String>) -> RoomId {
         let room_id = RoomId::new_random();
-        let room_state = DbRoomState::V1(DbRoomStateV1 {
+        let room_state = Room::V1(RoomV1 {
             choices,
             votes: HashMap::new(),
             tallied: false,
@@ -94,15 +63,15 @@ impl Db {
         room_id
     }
 
-    pub async fn read_room_state(&self, room_id: &RoomId) -> Option<DbRoom> {
+    pub async fn read_room_state(&self, room_id: &RoomId) -> Option<Room> {
         let row = sqlx::query("SELECT state FROM room WHERE id = ?")
             .bind(&room_id.0)
             .fetch_one(&self.db_pool)
             .await
             .ok()?;
         let room_state_json: String = row.get(0);
-        match serde_json::from_str::<DbRoomState>(&room_state_json) {
-            Ok(room_state) => Some(room_state.into()),
+        match serde_json::from_str::<Room>(&room_state_json) {
+            Ok(room_state) => Some(room_state),
             Err(e) => {
                 log::error!("Failed to deserialize room {room_id} state: {e}");
                 None
@@ -110,9 +79,9 @@ impl Db {
         }
     }
 
-    pub async fn write_room_state(&self, room_id: &RoomId, room_state: DbRoom) -> bool {
-        let room_state_json = serde_json::to_string(&DbRoomState::from(room_state))
-            .expect("Failed to serialize room state");
+    pub async fn write_room_state(&self, room_id: &RoomId, room_state: Room) -> bool {
+        let room_state_json =
+            serde_json::to_string(&room_state).expect("Failed to serialize room state");
         // Note: silently fails if room does not exist in database.
         // Returns false if the room does not exist.
         sqlx::query("UPDATE room SET state = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?")

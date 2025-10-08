@@ -11,12 +11,16 @@ use warp::{
     Filter, Reply,
 };
 
-use decide_api as api;
+use decide_api::{self as api, UserVote};
 
-use crate::{condorcet::ranked_pairs, WebResult};
+use crate::{
+    condorcet::ranked_pairs,
+    vote::db::{Room, RoomV1},
+    WebResult,
+};
 
 use self::{
-    db::{Db, DbRoom},
+    db::Db,
     util::{ClientId, RoomId},
 };
 
@@ -43,21 +47,25 @@ impl ServerRoom {
         }
     }
 
-    fn add_client(&mut self, client_id: ClientId, handle: ConnectionHandle, db_room: &DbRoom) {
+    fn add_client(&mut self, client_id: ClientId, handle: ConnectionHandle, db_room: &Room) {
         self.clients.entry(client_id).or_default().push(handle);
         self.broadcast_room_state(db_room)
     }
 
-    fn update_results_cache(&mut self, db_room: &DbRoom) {
-        if db_room.tallied && self.results_cache.is_none() {
-            self.results_cache = Some(calculate_room_tally(&db_room.choices, &db_room.votes));
-        } else if !db_room.tallied && self.results_cache.is_some() {
-            log::error!("Results cache incorrectly populated");
-            self.results_cache = None;
+    fn update_results_cache(&mut self, room: &Room) {
+        match room {
+            Room::V1(room) => {
+                if room.tallied && self.results_cache.is_none() {
+                    self.results_cache = Some(calculate_room_tally(&room.choices, &room.votes));
+                } else if !room.tallied && self.results_cache.is_some() {
+                    log::error!("Results cache incorrectly populated");
+                    self.results_cache = None;
+                }
+            }
         }
     }
 
-    fn broadcast_room_state(&mut self, db_room: &DbRoom) {
+    fn broadcast_room_state(&mut self, db_room: &Room) {
         self.update_results_cache(db_room);
         for (client_id, client) in self.clients.iter() {
             for handle in client {
@@ -72,31 +80,34 @@ impl ServerRoom {
     fn get_client_notification(
         &self,
         client_id: &ClientId,
-        db_room: &DbRoom,
+        room: &Room,
     ) -> api::ClientNotification {
-        let DbRoom {
-            choices,
-            votes,
-            tallied,
-        } = db_room;
-        if *tallied != self.results_cache.is_some() {
-            log::error!(
-                "Results cache incorrect. Tallied: {tallied}, cache: {}",
-                self.results_cache.is_some()
-            );
-        }
-        api::ClientNotification {
-            status: api::ClientStatus::Connected,
-            vote: Some(api::VoteView {
-                choices: choices.clone(),
-                your_vote: votes.get(client_id).cloned(),
-                num_votes: votes.len(),
-                num_players: self.clients.len(),
-                results: self.results_cache.as_ref().map(|tally| api::VotingResults {
-                    tally: tally.clone(),
-                    votes: db_room.votes.values().cloned().collect(),
-                }),
-            }),
+        match room {
+            Room::V1(RoomV1 {
+                choices,
+                votes,
+                tallied,
+            }) => {
+                if *tallied != self.results_cache.is_some() {
+                    log::error!(
+                        "Results cache incorrect. Tallied: {tallied}, cache: {}",
+                        self.results_cache.is_some()
+                    );
+                }
+                api::ClientNotification {
+                    status: api::ClientStatus::Connected,
+                    vote: Some(api::VoteView {
+                        choices: choices.clone(),
+                        your_vote: votes.get(client_id).cloned(),
+                        num_votes: votes.len(),
+                        num_players: self.clients.len(),
+                        results: self.results_cache.as_ref().map(|tally| api::VotingResults {
+                            tally: tally.clone(),
+                            votes: votes.values().cloned().collect(),
+                        }),
+                    }),
+                }
+            }
         }
     }
 
@@ -107,17 +118,25 @@ impl ServerRoom {
         vote: api::UserVote,
         db: &Db,
     ) {
-        let mut db_room = db.read_room_state(room_id).await.expect("Missing DB room");
-        db_room.votes.insert(client_id, vote);
-        db.write_room_state(room_id, db_room.clone()).await;
-        self.broadcast_room_state(&db_room);
+        let room = db.read_room_state(room_id).await.expect("Missing DB room");
+        match room {
+            Room::V1(mut room) => {
+                room.votes.insert(client_id, vote);
+                db.write_room_state(room_id, Room::V1(room.clone())).await;
+                self.broadcast_room_state(&Room::V1(room));
+            }
+        }
     }
 
     async fn tally(&mut self, room_id: &RoomId, db: &Db) {
-        let mut db_room = db.read_room_state(room_id).await.expect("Missing DB room");
-        db_room.tallied = true;
-        db.write_room_state(room_id, db_room.clone()).await;
-        self.broadcast_room_state(&db_room);
+        let room = db.read_room_state(room_id).await.expect("Missing DB room");
+        match room {
+            Room::V1(mut room) => {
+                room.tallied = true;
+                db.write_room_state(room_id, Room::V1(room.clone())).await;
+                self.broadcast_room_state(&Room::V1(room));
+            }
+        }
     }
 }
 
@@ -134,7 +153,7 @@ pub struct VoteState {
 
 fn calculate_room_tally(
     choices: &[String],
-    votes: &HashMap<ClientId, api::UserVote>,
+    votes: &HashMap<ClientId, UserVote>,
 ) -> api::CondorcetTally {
     let num_choices = choices.len();
     let votes: Vec<Vec<crate::condorcet::VoteItem>> = votes
