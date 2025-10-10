@@ -76,7 +76,7 @@
               pname = "decide-client";
               version = "0.1.0";
               src = ./client;
-              npmDepsHash = "sha256-/+GQMWFb5lzfJnd/LAKSY+goH0kjbt/3gLiX2SFU6cQ=";
+              npmDepsHash = "sha256-cD6J//vQO5MjTiteRV3HqrZsz17Evns7qScp2MUgsaE=";
             };
             client = pkgs.runCommand "copy" { } ''
               cp -r ${clientNpmPackage}/lib/node_modules/decide/dist/ $out/
