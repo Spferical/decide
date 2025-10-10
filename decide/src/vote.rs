@@ -344,8 +344,11 @@ async fn handle_vote_client(
                 Some(Ok(msg)) => {
                     log::debug!("Got message: {msg:?}");
                     #[allow(clippy::if_same_then_else)]
-                    if msg.is_ping() && ws.send(Message::pong("")).await.is_err() {
-                        break
+                    if msg.is_ping() {
+                        if ws.send(Message::pong("")).await.is_err() {
+                            break
+                        }
+                        continue
                     } else if msg.is_close() {
                         break
                     } else if msg.is_pong() {
