@@ -159,10 +159,7 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
     }
 
     onKeyDown(choiceIndex: number, e: KeyboardEvent) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this.onChoiceClick(choiceIndex, e as any);
-        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();
             const currentRank = this.getChoiceRank(choiceIndex);
             const targetRank = e.key === 'ArrowUp' ? currentRank - 1 : currentRank + 1;
@@ -314,12 +311,6 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
                     onClick={(e) => this.onRowClick(rankIndex)}
                     onDragOver={(e: DragEvent) => this.onRowDragOver(e)}
                     onDrop={(e: DragEvent) => this.onRowDrop(e, rankIndex)}
-                    onKeyDown={(e: KeyboardEvent) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            this.onRowClick(rankIndex);
-                        }
-                    }}
                 >
                     <td class="ballot-rank-cell">Rank {rankIndex + 1}</td>
                     <td class="ballot-choices-cell">{choices}</td>
