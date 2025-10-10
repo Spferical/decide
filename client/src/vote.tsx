@@ -386,7 +386,15 @@ type Results = {
     tally: Tally,
 }
 
-function VoteResults({ choices, results }: { choices: string[], results: Results }) {
+type ResultsProps = {
+    choices: string[],
+    results: Results,
+    tallied: boolean,
+}
+
+function VoteResults(props: ResultsProps) {
+    const results = props.results;
+    const choices = props.choices;
     const votes = results.votes.map((v, i) => <li key={i}>{describe_vote(choices, v)}</li>);
     votes.sort();
     const tchoices = choices.map((c, i) => <th key={i} scope="row">{c}</th>);
@@ -406,7 +414,12 @@ function VoteResults({ choices, results }: { choices: string[], results: Results
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
     return <article>
         <header role="banner">
-            <h2>The results are in! The {winner_desc}: <strong>{winners.join(" AND ")}</strong></h2>
+            <h2> Results </h2>
+            <p>The {winner_desc}: <strong>{winners.join(" AND ")}</strong></p>
+            <p>The full ranks are:</p>
+            <ol>
+                {ranks}
+            </ol>
         </header>
         <details>
             <summary>See detailed results</summary>
@@ -418,10 +431,6 @@ function VoteResults({ choices, results }: { choices: string[], results: Results
                 {thead}
                 <tbody>{trows}</tbody>
             </table>
-            <p>The full ranks are:</p>
-            <ol>
-                {ranks}
-            </ol>
         </details>
     </article>
 }
@@ -435,6 +444,8 @@ type VoteView = {
     your_vote: UserVote | null
     num_votes: number
     num_players: number
+    tallied: boolean,
+    live_results: boolean,
     results: Results | null
 }
 
@@ -469,6 +480,11 @@ export class Vote extends Component<VoteProps, VoteState> {
                     <form action="/api/start_vote" method="post">
                         <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
                         <p><textarea name="choices" id="choices" required aria-required="true" /></p>
+                        <p><label>
+                            <input type='checkbox' name='live-results' id='live-results' value='true' />
+                            Show live results to voters.
+                        </label></p>
+
                         <input type="submit" value="Start Vote" />
                     </form>
                 </main>
@@ -520,7 +536,7 @@ export class Vote extends Component<VoteProps, VoteState> {
 
         let results = null;
         if (state.vote.results) {
-            results = <VoteResults choices={state.vote.choices} results={state.vote.results} />
+            results = <VoteResults choices={state.vote.choices} results={state.vote.results} tallied={state.vote.tallied} />
         }
 
         const submit_text = (state.vote.your_vote) ? "Resubmit Your Vote" : "Submit Your Vote";
@@ -563,7 +579,7 @@ export class Vote extends Component<VoteProps, VoteState> {
             <Fragment>
                 <main>
                     {state.vote.num_players <= 1 && <p class="notice" role="status"> Send this URL to all voters:<br /><CopyLink /> </p>}
-                    {!state.vote.results && ballot_section}
+                    {!state.vote.tallied && ballot_section}
                     {submitted_section}
                     {!state.vote.results && <p><button onClick={tally}>End Voting and Show the Results</button></p>}
                     <p role="status">{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>

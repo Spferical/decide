@@ -13,11 +13,18 @@ pub struct RoomV1 {
     pub choices: Vec<String>,
     pub votes: HashMap<ClientId, decide_api::UserVote>,
     pub tallied: bool,
+    #[serde(default)]
+    pub live_results: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Room {
     V1(RoomV1),
+}
+
+pub struct RoomOptions {
+    pub choices: Vec<String>,
+    pub live_results: bool,
 }
 
 /*
@@ -45,12 +52,13 @@ impl Db {
         Ok(Self { db_pool })
     }
 
-    pub async fn create_room(&self, choices: Vec<String>) -> RoomId {
+    pub async fn create_room(&self, opts: RoomOptions) -> RoomId {
         let room_id = RoomId::new_random();
         let room_state = Room::V1(RoomV1 {
-            choices,
+            choices: opts.choices,
             votes: HashMap::new(),
             tallied: false,
+            live_results: opts.live_results,
         });
         let room_state_json =
             serde_json::to_string(&room_state).expect("Failed to serialize initial room state");

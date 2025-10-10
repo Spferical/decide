@@ -37,12 +37,17 @@ pub struct VoteView {
     pub your_vote: Option<UserVote>,
     pub num_votes: usize,
     pub num_players: usize,
+    pub tallied: bool,
+    pub live_results: bool,
     pub results: Option<VotingResults>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct NewVoteForm {
     pub choices: String,
+    #[serde(rename = "live-results")]
+    #[serde(default)]
+    pub live_results: bool,
 }
 
 #[derive(Deserialize)]

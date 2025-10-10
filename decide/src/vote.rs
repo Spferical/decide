@@ -15,7 +15,7 @@ use decide_api::{self as api, UserVote};
 
 use crate::{
     condorcet::ranked_pairs,
-    vote::db::{Room, RoomV1},
+    vote::db::{Room, RoomOptions, RoomV1},
     WebResult,
 };
 
@@ -33,17 +33,15 @@ pub(crate) mod util;
 struct ServerRoom {
     // Each client may have multiple tabs open.
     clients: HashMap<ClientId, Vec<ConnectionHandle>>,
-    // NOTE: the database tally_calculated flag is the source of truth for
-    // whether the results are officially tallied i.e. the vote is done.
-    // This field is only used to avoid re-calculating the results.
-    results_cache: Option<api::CondorcetTally>,
+    // Results of the poll. May not be final.
+    results: Option<api::CondorcetTally>,
 }
 
 impl ServerRoom {
     fn new() -> Self {
         Self {
             clients: HashMap::new(),
-            results_cache: None,
+            results: None,
         }
     }
 
@@ -55,11 +53,8 @@ impl ServerRoom {
     fn update_results_cache(&mut self, room: &Room) {
         match room {
             Room::V1(room) => {
-                if room.tallied && self.results_cache.is_none() {
-                    self.results_cache = Some(calculate_room_tally(&room.choices, &room.votes));
-                } else if !room.tallied && self.results_cache.is_some() {
-                    log::error!("Results cache incorrectly populated");
-                    self.results_cache = None;
+                if room.tallied || room.live_results {
+                    self.results = Some(calculate_room_tally(&room.choices, &room.votes));
                 }
             }
         }
@@ -87,27 +82,22 @@ impl ServerRoom {
                 choices,
                 votes,
                 tallied,
-            }) => {
-                if *tallied != self.results_cache.is_some() {
-                    log::error!(
-                        "Results cache incorrect. Tallied: {tallied}, cache: {}",
-                        self.results_cache.is_some()
-                    );
-                }
-                api::ClientNotification {
-                    status: api::ClientStatus::Connected,
-                    vote: Some(api::VoteView {
-                        choices: choices.clone(),
-                        your_vote: votes.get(client_id).cloned(),
-                        num_votes: votes.len(),
-                        num_players: self.clients.len(),
-                        results: self.results_cache.as_ref().map(|tally| api::VotingResults {
-                            tally: tally.clone(),
-                            votes: votes.values().cloned().collect(),
-                        }),
+                live_results,
+            }) => api::ClientNotification {
+                status: api::ClientStatus::Connected,
+                vote: Some(api::VoteView {
+                    choices: choices.clone(),
+                    your_vote: votes.get(client_id).cloned(),
+                    num_votes: votes.len(),
+                    num_players: self.clients.len(),
+                    tallied: *tallied,
+                    live_results: *live_results,
+                    results: self.results.as_ref().map(|tally| api::VotingResults {
+                        tally: tally.clone(),
+                        votes: votes.values().cloned().collect(),
                     }),
-                }
-            }
+                }),
+            },
         }
     }
 
@@ -185,8 +175,8 @@ impl VoteState {
         })
     }
 
-    async fn create_room(&self, choices: Vec<String>) -> RoomId {
-        self.db.create_room(choices).await
+    async fn create_room(&self, opts: RoomOptions) -> RoomId {
+        self.db.create_room(opts).await
     }
 
     async fn register_client(
@@ -253,14 +243,19 @@ impl VoteState {
 }
 
 async fn start_vote(state: Arc<Mutex<VoteState>>, form: api::NewVoteForm) -> WebResult<impl Reply> {
-    let choices = form
+    let choices: Vec<String> = form
         .choices
         .split('\n')
         .map(|choice| choice.trim())
         .filter(|choice| !choice.is_empty())
         .map(|choice| choice.to_owned())
         .collect();
-    let room_id = state.lock().await.create_room(choices).await;
+    let live_results = form.live_results;
+    let opts = RoomOptions {
+        choices,
+        live_results,
+    };
+    let room_id = state.lock().await.create_room(opts).await;
     let uri = Uri::builder()
         .path_and_query(format!("/vote/{room_id}"))
         .build()
