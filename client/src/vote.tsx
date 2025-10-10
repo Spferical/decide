@@ -149,7 +149,6 @@ class Choices extends Component<ChoicesProps, ChoicesState> {
     }
 
     onRowMouseDown(e: MouseEvent) {
-        console.log(e);
         if (e.target instanceof HTMLElement) {
             if (!e.target.dataset.choice) {
                 // Prevent focusing <body> when clicking a row.
@@ -497,7 +496,6 @@ export class Vote extends Component<VoteProps, VoteState> {
             this.ws = make_websocket(`/api/vote/${state.room}?id=${get_vote_uuid()}`);
             this.ws.onclose = evt => {
                 console.log("Websocket disconnected!");
-                console.log(evt);
                 this.setState({ status: "disconnected" });
             };
             this.ws.onmessage = msg => {
