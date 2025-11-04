@@ -402,9 +402,9 @@ function VoteResults(props: ResultsProps) {
     );
     const winners = (results.tally.ranks[0] || []).map(i => choices[i]);
     let winner_desc = (winners.length > 1) ? "winners are" : "winner is";
-    return <article>
+    return <details>
+        <summary>Results</summary>
         <header role="banner">
-            <h2> Results </h2>
             <p>The {winner_desc}: <strong>{winners.join(" AND ")}</strong></p>
             <p>The full ranks are:</p>
             <ol>
@@ -422,7 +422,7 @@ function VoteResults(props: ResultsProps) {
                 <tbody>{trows}</tbody>
             </table>
         </details>
-    </article>
+    </details>
 }
 
 type VoteProps = {
