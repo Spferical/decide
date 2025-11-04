@@ -53,7 +53,7 @@ impl ServerRoom {
     fn update_results_cache(&mut self, room: &Room) {
         match room {
             Room::V1(room) => {
-                if room.tallied || room.live_results {
+                if room.tallied || (room.live_results && !room.votes.is_empty()) {
                     self.results = Some(calculate_room_tally(&room.choices, &room.votes));
                 }
             }
