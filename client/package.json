@@ -6,9 +6,9 @@
 		"dist"
 	],
 	"scripts": {
-		"start": "vite",
+		"start": "vite --clearScreen false",
 		"build": "vite build",
-		"serve": "vite preview",
+		"serve": "vite preview --clearScreen false",
 		"lint": "eslint src/*.tsx"
 	},
 	"eslintConfig": {
