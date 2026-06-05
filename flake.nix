@@ -112,7 +112,16 @@
 
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
-          packages = with pkgs; [ sqlx-cli ];
+          packages = with pkgs; [ 
+            sqlx-cli
+            nodejs
+            playwright-driver.browsers
+          ];
+          shellHook = ''
+            export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+            export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu-24.04"
+          '';
         };
       });
 }
