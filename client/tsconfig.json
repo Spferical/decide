@@ -9,7 +9,7 @@
 		"checkJs": true,
 		// "strict": true,
 		"noEmit": true,
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"target": "ESNext",
 		"module": "esnext",
 		"resolveJsonModule": true,

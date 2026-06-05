@@ -2,5 +2,15 @@
   "extends": [
     "react-app"
   ],
+  "settings": {
+    "react": {
+      "version": "16.0"
+    },
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+      }
+    }
+  },
   "rules": {"no-script-url": "off", "jsx-a11y/anchor-is-valid": "off"}
 }

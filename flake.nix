@@ -79,7 +79,7 @@
               pname = "decide-client";
               version = "0.1.0";
               src = ./client;
-              npmDepsHash = "sha256-cD6J//vQO5MjTiteRV3HqrZsz17Evns7qScp2MUgsaE=";
+              npmDepsHash = "sha256-7acdZB3roGhIZQPaF1QXeue/fR5WL1oc56H03VbUjd8=";
             };
             client = pkgs.runCommand "copy" { } ''
               cp -r ${clientNpmPackage}/lib/node_modules/decide/dist/ $out/
