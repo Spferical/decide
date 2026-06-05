@@ -1,0 +1,4 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2023-0071"  # rsa timing attack - not used (via sqlx-mysql, but we only use sqlite)
+]
