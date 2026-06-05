@@ -11,7 +11,8 @@
 		"build": "vite build",
 		"serve": "vite preview --clearScreen false",
 		"lint": "eslint src/*.tsx",
-		"test": "vitest run"
+		"test": "vitest run",
+		"test:e2e": "bash ../scripts/e2e_test.sh"
 	},
 	"eslintConfig": {
 		"extends": "preact"
@@ -24,6 +25,7 @@
 		"uuid": "^14.0.0"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.50.0",
 		"@preact/preset-vite": "^2.10.5",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/preact": "^3.2.4",
