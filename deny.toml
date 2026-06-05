@@ -1,7 +1,7 @@
 [licenses]
 allow = [
   "MIT",
-  "BSD-3-Clause",
   "Apache-2.0",
-  "Unicode-3.0"
+  "Unicode-3.0",
+  "Zlib"
 ]

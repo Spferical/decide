@@ -2,7 +2,7 @@
   description = "Build a cargo project";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-26.05";
 
     crane = {
       url = "github:ipetkov/crane";
@@ -65,7 +65,10 @@
           decide-clippy = craneLib.cargoClippy ({ cargoClippyExtraArgs = "--all-targets -- --deny warnings"; inherit cargoArtifacts; } // commonArgs);
           decide-doc = craneLib.cargoDoc ({ inherit cargoArtifacts; } // commonArgs);
           decide-fmt = craneLib.cargoFmt commonArgs;
-          decide-audit = craneLib.cargoAudit { inherit src advisory-db; };
+          decide-audit = craneLib.cargoAudit {
+            inherit src advisory-db;
+            cargoAuditExtraArgs = "--ignore RUSTSEC-2023-0071";  # rsa timing attack - not used (via sqlx-mysql,we only use sqlite)
+          };
           decide-deny = craneLib.cargoDeny commonArgs;
           decide-nextest = craneLib.cargoNextest ({ inherit cargoArtifacts; partitions = 1; partitionType = "count"; } // commonArgs);
         };
