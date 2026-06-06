@@ -480,18 +480,18 @@ export class Vote extends Component<VoteProps, VoteState> {
                             <input type='checkbox' name='live-results' id='live-results' value='true' />
                             Show live results to voters.
                         </label></p>
-                        <p>
-                            <label for="end-rule">Who can end the vote?</label><br />
-                            <select name="end-rule" id="end-rule" onChange={on_end_rule_change}>
+                        <p style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <label for="end-rule" style={{ margin: 0 }}>Who can end the vote?</label>
+                            <select name="end-rule" id="end-rule" onChange={on_end_rule_change} style={{ width: 'auto', margin: 0 }}>
                                 <option value="anyone">Anyone can end the vote</option>
                                 <option value="creator">Only the creator can end the vote</option>
                                 <option value="password">Password required to end the vote</option>
                             </select>
                         </p>
                         {state.creation_end_rule === "password" && (
-                            <p>
-                                <label for="end-password">Password to end the vote:</label><br />
-                                <input type="password" name="end-password" id="end-password" required aria-required="true" />
+                            <p style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <label for="end-password" style={{ margin: 0 }}>Password to end the vote:</label>
+                                <input type="password" name="end-password" id="end-password" required aria-required="true" style={{ width: 'auto', margin: 0 }} />
                             </p>
                         )}
 
