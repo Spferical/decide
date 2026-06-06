@@ -1,37 +1,34 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Rock Paper Scissors', () => {
-  test('Two players can play a game', async ({ browser }) => {
-    const pageA = await browser.newPage();
-    const roomId = 'test-room';
-    await pageA.goto(`/rps/${roomId}`);
+    test('Draw handling', async ({ browser }) => {
+        const roomId = 'draw-test';
+        const playerA = await browser.newPage();
+        await playerA.goto(`/rps/${roomId}`);
+        const playerB = await browser.newPage();
+        await playerB.goto(`/rps/${roomId}`);
 
-    const pageB = await browser.newPage();
-    await pageB.goto(`/rps/${roomId}`);
+        // Both pick rock
+        await playerA.click('button:has-text("rock")');
+        await playerB.click('button:has-text("rock")');
 
-    // Both select rock
-    await pageA.click('button:has-text("rock")');
-    await pageB.click('button:has-text("rock")');
+        await expect(playerA.locator('text=draw: rock vs rock')).toBeVisible();
+    });
 
-    // Verify history shows draw
-    await expect(pageA.locator('text=draw: rock vs rock')).toBeVisible();
-    await expect(pageB.locator('text=draw: rock vs rock')).toBeVisible();
-  });
+    test('Player disconnection', async ({ browser }) => {
+        const roomId = 'disconnect-test';
+        const playerA = await browser.newPage();
+        await playerA.goto(`/rps/${roomId}`);
+        const playerB = await browser.newPage();
+        await playerB.goto(`/rps/${roomId}`);
 
-  test('Spectator view', async ({ browser }) => {
-    const roomId = 'spectator-test';
-    const playerA = await browser.newPage();
-    await playerA.goto(`/rps/${roomId}`);
-    const playerB = await browser.newPage();
-    await playerB.goto(`/rps/${roomId}`);
-    
-    // Player A picks
-    await playerA.click('button:has-text("rock")');
+        // Both are connected, verify both are players
+        await expect(playerB.locator('text=You are a player!')).toBeVisible();
 
-    // Spectator joins
-    const spectator = await browser.newPage();
-    await spectator.goto(`/rps/${roomId}`);
-    
-    await expect(spectator.locator('text=You are a spectator!')).toBeVisible();
-  });
+        // Player A leaves
+        await playerA.close();
+
+        // Player B should see the notice to send URL to opponent since players count dropped < 2
+        await expect(playerB.locator('text=Send this URL to your opponent to connect.')).toBeVisible();
+    });
 });

@@ -12,6 +12,6 @@ vi.mock('./websocket', () => ({
 }));
 
 test('renders Rps component', () => {
-  render(<Rps room="test-room" />);
-  expect(screen.getByRole('status')).toHaveTextContent('Connecting...');
+    render(<Rps room="test-room" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Connecting...');
 });
