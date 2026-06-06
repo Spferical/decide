@@ -15,6 +15,12 @@ pub struct RoomV1 {
     pub tallied: bool,
     #[serde(default)]
     pub live_results: bool,
+    #[serde(default)]
+    pub creator_id: Option<ClientId>,
+    #[serde(default)]
+    pub end_rule: decide_api::EndRule,
+    #[serde(default)]
+    pub end_password: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -25,6 +31,9 @@ pub enum Room {
 pub struct RoomOptions {
     pub choices: Vec<String>,
     pub live_results: bool,
+    pub creator_id: Option<ClientId>,
+    pub end_rule: decide_api::EndRule,
+    pub end_password: Option<String>,
 }
 
 /*
@@ -59,6 +68,9 @@ impl Db {
             votes: HashMap::new(),
             tallied: false,
             live_results: opts.live_results,
+            creator_id: opts.creator_id,
+            end_rule: opts.end_rule,
+            end_password: opts.end_password,
         });
         let room_state_json =
             serde_json::to_string(&room_state).expect("Failed to serialize initial room state");

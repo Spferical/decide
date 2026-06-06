@@ -436,6 +436,8 @@ type VoteView = {
     tallied: boolean,
     live_results: boolean,
     results: Results | null
+    end_rule: "anyone" | "creator" | "password",
+    is_creator: boolean,
 }
 
 type VoteState = {
@@ -443,10 +445,11 @@ type VoteState = {
     status: string
     voter_name: string
     vote: VoteView | null
+    creation_end_rule: "anyone" | "creator" | "password"
 }
 
 export class Vote extends Component<VoteProps, VoteState> {
-    state = { room: null, status: "connecting", voter_name: "", vote: null };
+    state = { room: null, status: "connecting", voter_name: "", vote: null, creation_end_rule: "anyone" as const };
     ws: WebSocket | null = null;
     choices_component = createRef();
     initial_vote: UserVote | null = null;
@@ -463,16 +466,34 @@ export class Vote extends Component<VoteProps, VoteState> {
 
     render(props: VoteProps, state: VoteState) {
         if (!props.room) {
+            const on_end_rule_change = (e: Event) => {
+                this.setState({ creation_end_rule: (e.target as HTMLSelectElement).value as any });
+            };
             return <Fragment>
                 <main>
                     <h1>Start a Vote</h1>
                     <form action="/api/start_vote" method="post">
+                        <input type="hidden" name="creator-id" value={get_vote_uuid()} />
                         <p><label for="choices">Enter the choices up for vote, one per line:</label></p>
                         <p><textarea name="choices" id="choices" required aria-required="true" /></p>
                         <p><label>
                             <input type='checkbox' name='live-results' id='live-results' value='true' />
                             Show live results to voters.
                         </label></p>
+                        <p>
+                            <label for="end-rule">Who can end the vote?</label><br />
+                            <select name="end-rule" id="end-rule" onChange={on_end_rule_change}>
+                                <option value="anyone">Anyone can end the vote</option>
+                                <option value="creator">Only the creator can end the vote</option>
+                                <option value="password">Password required to end the vote</option>
+                            </select>
+                        </p>
+                        {state.creation_end_rule === "password" && (
+                            <p>
+                                <label for="end-password">Password to end the vote:</label><br />
+                                <input type="password" name="end-password" id="end-password" required aria-required="true" />
+                            </p>
+                        )}
 
                         <input type="submit" value="Start Vote" />
                     </form>
@@ -492,6 +513,8 @@ export class Vote extends Component<VoteProps, VoteState> {
                 let new_state = JSON.parse(msg.data);
                 if (new_state.status === "invalid_room") {
                     this.setState({ status: "invalid_room", vote: null, room: null });
+                } else if (new_state.status === "invalid_password") {
+                    alert("Incorrect password! Failed to end voting.");
                 } else {
                     this.setState(new_state)
                 }
@@ -525,6 +548,12 @@ export class Vote extends Component<VoteProps, VoteState> {
         };
 
         const tally = () => this.ws.send(JSON.stringify({ tally: null }));
+        const tally_with_password = () => {
+            const password = prompt("Enter the password to end voting:");
+            if (password !== null) {
+                this.ws.send(JSON.stringify({ tally: password }));
+            }
+        };
 
         let results = null;
         if (state.vote.results) {
@@ -573,7 +602,15 @@ export class Vote extends Component<VoteProps, VoteState> {
                     {state.vote.num_players <= 1 && !state.vote.tallied && <p class="notice" role="status"> Send this URL to all voters:<br /><CopyLink /> </p>}
                     {!state.vote.tallied && ballot_section}
                     {submitted_section}
-                    {!state.vote.results && <p><button onClick={tally}>End Voting and Show the Results</button></p>}
+                    {!state.vote.results && (
+                        state.vote.end_rule === "anyone" || (state.vote.end_rule === "creator" && state.vote.is_creator) ? (
+                            <p><button onClick={tally}>End Voting and Show the Results</button></p>
+                        ) : state.vote.end_rule === "password" ? (
+                            <p><button onClick={tally_with_password}>End Voting and Show the Results (Password Protected)</button></p>
+                        ) : (
+                            <p class="notice" role="status">Only the vote creator can end voting.</p>
+                        )
+                    )}
                     <p role="status">{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
                     {results}
                 </main>

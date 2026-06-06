@@ -27,6 +27,12 @@ use self::{
 pub(crate) mod db;
 pub(crate) mod util;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TallyError {
+    Unauthorized,
+    IncorrectPassword,
+}
+
 /// State for a room stored in process memory.
 /// All room changes are synchronized with a mutable reference to this struct.
 /// Note: the database is the source of truth for the room state.
@@ -83,6 +89,9 @@ impl ServerRoom {
                 votes,
                 tallied,
                 live_results,
+                creator_id,
+                end_rule,
+                end_password: _,
             }) => api::ClientNotification {
                 status: api::ClientStatus::Connected,
                 vote: Some(api::VoteView {
@@ -96,6 +105,8 @@ impl ServerRoom {
                         tally: tally.clone(),
                         votes: votes.values().cloned().collect(),
                     }),
+                    end_rule: *end_rule,
+                    is_creator: Some(*client_id) == *creator_id,
                 }),
             },
         }
@@ -118,13 +129,35 @@ impl ServerRoom {
         }
     }
 
-    async fn tally(&mut self, room_id: &RoomId, db: &Db) {
+    async fn tally(
+        &mut self,
+        room_id: &RoomId,
+        client_id: ClientId,
+        password: Option<String>,
+        db: &Db,
+    ) -> Result<(), TallyError> {
         let room = db.read_room_state(room_id).await.expect("Missing DB room");
         match room {
             Room::V1(mut room) => {
+                match room.end_rule {
+                    api::EndRule::Anyone => {}
+                    api::EndRule::Creator => {
+                        if room.creator_id != Some(client_id) {
+                            return Err(TallyError::Unauthorized);
+                        }
+                    }
+                    api::EndRule::Password => {
+                        if let Some(ref pwd) = room.end_password {
+                            if password.as_ref() != Some(pwd) {
+                                return Err(TallyError::IncorrectPassword);
+                            }
+                        }
+                    }
+                }
                 room.tallied = true;
                 db.write_room_state(room_id, Room::V1(room.clone())).await;
                 self.broadcast_room_state(&Room::V1(room));
+                Ok(())
             }
         }
     }
@@ -207,9 +240,16 @@ impl VoteState {
         }
     }
 
-    async fn tally(&mut self, room_id: &RoomId) {
+    async fn tally(
+        &mut self,
+        room_id: &RoomId,
+        client_id: ClientId,
+        password: Option<String>,
+    ) -> Result<(), TallyError> {
         if let Some(room) = self.rooms.get_mut(room_id) {
-            room.tally(room_id, &self.db).await
+            room.tally(room_id, client_id, password, &self.db).await
+        } else {
+            Err(TallyError::Unauthorized)
         }
     }
 
@@ -251,9 +291,15 @@ async fn start_vote(state: Arc<Mutex<VoteState>>, form: api::NewVoteForm) -> Web
         .map(|choice| choice.to_owned())
         .collect();
     let live_results = form.live_results;
+    let creator_id = Uuid::parse_str(&form.creator_id).ok().map(ClientId);
+    let end_rule = form.end_rule;
+    let end_password = form.end_password.filter(|p| !p.is_empty());
     let opts = RoomOptions {
         choices,
         live_results,
+        creator_id,
+        end_rule,
+        end_password,
     };
     let room_id = state.lock().await.create_room(opts).await;
     let uri = Uri::builder()
@@ -300,7 +346,7 @@ async fn handle_vote_client(
             ))
             .await
             .ok();
-            ws.flush().await;
+            let _ = ws.flush().await;
             return;
         }
     };
@@ -311,10 +357,15 @@ async fn handle_vote_client(
             api::Command::Vote(user_vote) => {
                 let mut gs = global_state.lock().await;
                 gs.submit_vote(&room_id, client_id, user_vote).await;
+                None
             }
-            api::Command::Tally => {
+            api::Command::Tally(password) => {
                 let mut gs = global_state.lock().await;
-                gs.tally(&room_id).await;
+                match gs.tally(&room_id, client_id, password).await {
+                    Ok(()) => None,
+                    Err(TallyError::IncorrectPassword) => Some(api::ClientStatus::InvalidPassword),
+                    Err(TallyError::Unauthorized) => None,
+                }
             }
         }
     };
@@ -355,13 +406,21 @@ async fn handle_vote_client(
                             Ok(command) => {
                                 let command_start = Instant::now();
                                 let command_name = api::Command::name(&command);
-                                on_command(
+                                if let Some(err_status) = on_command(
                                     global_state.clone(),
                                     room_id.clone(),
                                     client_id,
                                     command
                                 )
-                                .await;
+                                .await {
+                                    let err_msg = serde_json::to_string(&api::ClientNotification {
+                                        status: err_status,
+                                        vote: None,
+                                    }).unwrap();
+                                    if ws.send(Message::text(err_msg)).await.is_err() {
+                                        break;
+                                    }
+                                }
                                 let elapsed = Instant::now() - command_start;
                                 log::info!("{client_id} {command_name} {elapsed:?}");
                             },

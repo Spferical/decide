@@ -17,12 +17,22 @@ pub struct VoteItem {
     pub rank: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EndRule {
+    #[default]
+    Anyone,
+    Creator,
+    Password,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClientStatus {
     Connected,
     InvalidRoom,
     InvalidUuid,
+    InvalidPassword,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -40,6 +50,8 @@ pub struct VoteView {
     pub tallied: bool,
     pub live_results: bool,
     pub results: Option<VotingResults>,
+    pub end_rule: EndRule,
+    pub is_creator: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -48,6 +60,12 @@ pub struct NewVoteForm {
     #[serde(rename = "live-results")]
     #[serde(default)]
     pub live_results: bool,
+    #[serde(rename = "creator-id")]
+    pub creator_id: String,
+    #[serde(rename = "end-rule")]
+    pub end_rule: EndRule,
+    #[serde(rename = "end-password")]
+    pub end_password: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -67,14 +85,14 @@ pub struct UserVote {
 #[serde(rename_all = "snake_case")]
 pub enum Command {
     Vote(UserVote),
-    Tally,
+    Tally(Option<String>),
 }
 
 impl Command {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Vote(_) => "vote",
-            Self::Tally => "tally",
+            Self::Tally(_) => "tally",
         }
     }
 }
