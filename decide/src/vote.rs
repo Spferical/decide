@@ -147,8 +147,12 @@ impl ServerRoom {
                         }
                     }
                     api::EndRule::Password => {
-                        if let Some(ref pwd) = room.end_password {
-                            if password.as_ref() != Some(pwd) {
+                        if let Some(ref pwd_hash) = room.end_password {
+                            let matches = password
+                                .as_ref()
+                                .map(|p| bcrypt::verify(p, pwd_hash).unwrap_or(false))
+                                .unwrap_or(false);
+                            if !matches {
                                 return Err(TallyError::IncorrectPassword);
                             }
                         }
@@ -293,7 +297,10 @@ async fn start_vote(state: Arc<Mutex<VoteState>>, form: api::NewVoteForm) -> Web
     let live_results = form.live_results;
     let creator_id = Uuid::parse_str(&form.creator_id).ok().map(ClientId);
     let end_rule = form.end_rule;
-    let end_password = form.end_password.filter(|p| !p.is_empty());
+    let end_password = form
+        .end_password
+        .filter(|p| !p.is_empty())
+        .map(|p| bcrypt::hash(p, bcrypt::DEFAULT_COST).expect("Failed to hash password"));
     let opts = RoomOptions {
         choices,
         live_results,

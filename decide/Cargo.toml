@@ -20,3 +20,4 @@ decide_api = { version = "0.1.0", path = "../api" }
 uuid = "1.1.2"
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "time"] }
 time = { version = "0.3.20", features = ["serde"] }
+bcrypt = "0.19.1"
