@@ -1,7 +1,6 @@
 import { Component, createRef, Fragment } from 'preact';
 import Cookies from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
-import { route } from 'preact-router';
 
 import { CopyLink } from './copylink';
 import { make_websocket } from './websocket';
@@ -491,7 +490,11 @@ export class Vote extends Component<VoteProps, VoteState> {
             };
             this.ws.onmessage = msg => {
                 let new_state = JSON.parse(msg.data);
-                this.setState(new_state)
+                if (new_state.status === "invalid_room") {
+                    this.setState({ status: "invalid_room", vote: null, room: null });
+                } else {
+                    this.setState(new_state)
+                }
             };
         }
         if (state.status === "connecting") {
@@ -499,8 +502,8 @@ export class Vote extends Component<VoteProps, VoteState> {
         } else if (state.status === "disconnected") {
             return <footer role="status">Disconnected! Try refreshing.</footer>
         } else if (state.status === "invalid_room") {
-            route("/vote");
-            return <footer role="status">Invalid room!</footer>
+            window.location.href = "/vote";
+            return null;
         }
 
         console.assert(state.vote != null);
