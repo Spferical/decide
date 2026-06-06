@@ -116,6 +116,7 @@
             sqlx-cli
             nodejs
             playwright-driver.browsers
+            rust-analyzer
           ];
           shellHook = ''
             export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
