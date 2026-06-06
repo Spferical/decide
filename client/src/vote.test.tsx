@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/preact';
+import { render, screen } from '@testing-library/preact';
 import { expect, test } from 'vitest';
 import { Vote, Choices } from './vote';
 
