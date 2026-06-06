@@ -300,6 +300,7 @@ async fn handle_vote_client(
             ))
             .await
             .ok();
+            ws.flush().await;
             return;
         }
     };
