@@ -21,7 +21,7 @@ test.describe('Voting & Synchronization', () => {
         await pageA.click('button:has-text("Submit Your Vote")');
 
         // 4. Verify User B sees the update (num_votes updated)
-        await expect(pageB.locator('text=/.*1\\/2 voters have submitted ballots.*/')).toBeVisible();
+        await expect(pageB.locator('text=/.*1 voters have submitted ballots.*/')).toBeVisible();
     });
 
     test('Voter can resubmit vote', async ({ browser }) => {

@@ -611,7 +611,7 @@ export class Vote extends Component<VoteProps, VoteState> {
                             <p class="notice" role="status">Only the vote creator can end voting.</p>
                         )
                     )}
-                    <p role="status">{state.vote.num_votes}/{state.vote.num_players} voters have submitted ballots.</p>
+                    <p role="status">{state.vote.num_players} people connected. {state.vote.num_votes} voters have submitted ballots.</p>
                     {results}
                 </main>
                 <footer>
