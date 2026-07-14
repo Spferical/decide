@@ -251,7 +251,7 @@ async fn handle_rps_client(global_state: Arc<Mutex<RpsState>>, room_id: String, 
                                 .collect(),
                         );
                         // clear choices
-                        for (_client_id, player_state) in room.players.iter_mut() {
+                        for player_state in room.players.values_mut() {
                             player_state.choice = None;
                         }
                     }
